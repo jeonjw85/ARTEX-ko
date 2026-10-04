@@ -12,22 +12,22 @@ import (
 	"testing"
 )
 
-// 本文件覆盖两条相关的加固：
-//   ① 投递地址不得把服务端当跳板打内网 / 云元数据（SSRF）
-//   ② 地址校验的错误信息不得带出地址里的凭据
+// 이 문서에서는 두 가지 관련 강화에 대해 설명합니다.
+//   ① 배송주소는 서버를 인트라넷/클라우드 메타데이터(SSRF)에 접근하기 위한 발판으로 삼아서는 안 됩니다.
+//   ② 주소 확인 시 오류 메시지가 해당 주소에 있는 자격 증명을 가져오면 안 됩니다.
 //
-// 关于测试环境：本包大量用例用 127.0.0.1 上的 httptest 假接收端，守卫默认会拦下
-// 它们。所以 TestMain 里统一打开 AllowLocalTargetsEnv，而下面每个 SSRF 用例都
-// 显式把它清掉，以断言**默认拒绝**的行为。
+// 테스트 환경 정보: 이 패키지의 많은 사용 사례는 127.0.0.1의 httptest 가짜 수신기를 사용하며 경비원은 기본적으로 이를 차단합니다.
+// 그들. 따라서 AllowLocalTargetsEnv는 TestMain에서 균일하게 열리고 아래의 각 SSRF 사용 사례는 다음과 같습니다.
+// **기본적으로 거부** 동작을 주장하려면 명시적으로 이를 지웁니다.
 
 func TestMain(m *testing.M) {
-	// 让常规用例能连本地的假接收端；SSRF 用例会自己临时清空。
+	// 일반 사용 사례가 로컬 가짜 수신기에 연결되도록 허용합니다. SSRF 사용 사례는 일시적으로 자체적으로 삭제됩니다.
 	_ = os.Setenv(AllowLocalTargetsEnv, "1")
 	os.Exit(m.Run())
 }
 
-// TestDialGuardRejectsLoopbackByDefault 是 SSRF 防护的核心断言：
-// 默认配置下，投递到环回地址必须被**连接层**拒绝。
+// TestDialGuardRejectsLoopbackByDefault는 SSRF 보호의 핵심 주장입니다.
+// 기본적으로 루프백 주소로의 전달은 연결 계층에서 거부되어야 합니다.
 func TestDialGuardRejectsLoopbackByDefault(t *testing.T) {
 	var hit bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -36,23 +36,23 @@ func TestDialGuardRejectsLoopbackByDefault(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv(AllowLocalTargetsEnv, "") // 关掉逃生口 = 默认行为
+	t.Setenv(AllowLocalTargetsEnv, "") // 탈출 해치 닫기 = 기본 동작
 	_, err := (dingTalkChannel{}).Send(context.Background(),
 		map[string]any{"webhook": srv.URL + "/robot/send"}, Message{Items: []Item{{Severity: "high"}}})
 	if err == nil {
-		t.Fatal("默认不应允许投递到环回地址")
+		t.Fatal("루프백 주소로의 배송은 기본적으로 허용되지 않습니다.")
 	}
 	if hit {
-		t.Fatal("请求已经打到了本机服务——守卫没生效")
+		t.Fatal("요청이 현지 서비스로 전송되었습니다. 경비원이 유효하지 않습니다.")
 	}
-	// 错误信息要能指导用户怎么放开（本机 SMTP 中继是合法配置）。
+	// 오류 메시지는 사용자에게 해제 방법을 안내할 수 있어야 합니다(이 기계의 SMTP 릴레이는 합법적인 구성입니다).
 	if !strings.Contains(err.Error(), AllowLocalTargetsEnv) {
-		t.Errorf("拒绝信息应说明如何显式放开: %v", err)
+		t.Errorf("거부 메시지에는 %v를 명시적으로 해제하는 방법이 설명되어 있어야 합니다.", err)
 	}
 }
 
-// TestDialGuardAllowsLoopbackWhenOptedIn 反向用例：显式打开后必须能用，
-// 否则本机 postfix / 内网中继这类合法部署会被一刀切废掉。
+// TestDialGuardAllowsLoopbackWhenOptedIn 역 사용 사례: 명시적으로 연 후 사용할 수 있어야 합니다.
+// 그렇지 않으면 로컬 postfix/인트라넷 릴레이와 같은 합법적인 배포가 전반적으로 폐기됩니다.
 func TestDialGuardAllowsLoopbackWhenOptedIn(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"errcode":0,"errmsg":"ok"}`)
@@ -62,38 +62,38 @@ func TestDialGuardAllowsLoopbackWhenOptedIn(t *testing.T) {
 	t.Setenv(AllowLocalTargetsEnv, "1")
 	if _, err := (dingTalkChannel{}).Send(context.Background(),
 		map[string]any{"webhook": srv.URL + "/robot/send"}, Message{Items: []Item{{Severity: "high"}}}); err != nil {
-		t.Fatalf("显式放开后应可投递: %v", err)
+		t.Fatalf("명시적인 릴리스 이후 제공 가능해야 합니다: %v", err)
 	}
 }
 
 func TestIsBlockedDialIP(t *testing.T) {
 	blocked := []string{
 		"127.0.0.1", "127.1.2.3", "::1",
-		"169.254.169.254", // 云元数据端点——本函数存在的主要理由
+		"169.254.169.254", // 클라우드 메타데이터 엔드포인트 - 이 기능이 존재하는 주된 이유
 		"169.254.1.1", "fe80::1",
 		"0.0.0.0", "::",
 		"224.0.0.1", "ff02::1",
-		"::ffff:127.0.0.1", // IPv4-mapped 形式必须还原后再判，否则是绕过口
+		"::ffff:127.0.0.1", // 판단하기 전에 IPv4-mapped 형식을 복원해야 합니다. 그렇지 않으면 포트가 우회됩니다.
 		"",
 	}
 	for _, s := range blocked {
 		if !isBlockedDialIP(net.ParseIP(s)) {
-			t.Errorf("%s 应被拒绝", s)
+			t.Errorf("%s는 거부되어야 합니다", s)
 		}
 	}
-	// RFC1918 私网**刻意放行**：内网自建 Mattermost / SMTP 中继是常见合法用法。
-	// 这条断言把这个取舍固定下来——若将来有人顺手加上私网判断，这里会失败，
-	// 从而逼出一次有意识的决定（而不是静默废掉一批部署）。
+	// RFC1918 개인 네트워크 **의도적으로 허용됨**: 자체 구축된 내부 네트워크 Mattermost / SMTP 릴레이는 일반적인 법적 사용입니다.
+	// 이 주장은 이러한 절충안을 해결합니다. 만약 누군가가 나중에 사설 네트워크 판단을 편리하게 추가한다면 이는 실패할 것입니다.
+	// 이는 일괄 배포를 자동으로 폐기하는 대신 의식적인 결정을 내리게 합니다.
 	allowed := []string{"10.0.0.5", "172.16.3.4", "192.168.1.10", "8.8.8.8", "2606:4700::1111"}
 	for _, s := range allowed {
 		if isBlockedDialIP(net.ParseIP(s)) {
-			t.Errorf("%s 应被放行（私网是常见的合法投递目标）", s)
+			t.Errorf("%s를 허용해야 합니다(개인 네트워크는 일반적으로 합법적인 전달 대상입니다).", s)
 		}
 	}
 }
 
-// TestValidateHTTPURLRejectsLiteralPrivateTargets 覆盖配置阶段的前置提示：
-// 字面 IP 在保存时就该被拒，而不是等第一次投递失败。
+// TestValidateHTTPURLRejectsLiteralPrivateTargets는 구성 단계의 사전 프롬프트를 다룹니다.
+// 첫 번째 전달이 실패할 때까지 기다리지 말고 저장 시 리터럴 IP를 거부했어야 합니다.
 func TestValidateHTTPURLRejectsLiteralPrivateTargets(t *testing.T) {
 	t.Setenv(AllowLocalTargetsEnv, "")
 	for _, raw := range []string{
@@ -102,92 +102,92 @@ func TestValidateHTTPURLRejectsLiteralPrivateTargets(t *testing.T) {
 		"http://[::1]:8080/hook",
 	} {
 		if err := validateHTTPURL(raw); err == nil {
-			t.Errorf("%s 应在配置阶段被拒绝", raw)
+			t.Errorf("%s는 구성 단계에서 거부되어야 합니다.", raw)
 		}
 	}
-	// 公网地址与私网地址照常通过（私网留给拨号阶段，那里不拦）。
+	// 공용 네트워크 주소와 개인 네트워크 주소는 평소대로 전달됩니다(사설 네트워크는 전화 접속 단계용으로 예약되어 있으며 여기서 차단되지 않습니다).
 	for _, raw := range []string{"https://oapi.dingtalk.com/robot/send", "http://10.0.0.9/hook"} {
 		if err := validateHTTPURL(raw); err != nil {
-			t.Errorf("%s 应通过校验: %v", raw, err)
+			t.Errorf("%s는 검증을 통과해야 합니다: %v", raw, err)
 		}
 	}
 }
 
-// TestValidateHTTPURLErrorNeverLeaksCredentials 是审计指出我上一轮遗漏的分支。
+// TestValidateHTTPURLErrorNeverLeaksCredentials는 감사에서 지난 라운드에서 놓쳤다고 지적한 브랜치입니다.
 //
-// url.Parse **失败**时会返回 *url.Error，其 Error() 含完整原始地址。上一轮我只
-// 脱敏了 http.Client.Do 的返回错误，漏了这里；而当时补的「永久失败路径」用例
-// （file://、gopher://、ftp://）其实都能被 url.Parse 解析成功、走的是 scheme 分支，
-// 所以全绿也证明不了这条路径安全——是假保证。
+// url.Parse가 **실패**하면 *url.Error를 반환하며, Error()에는 전체 원래 주소가 포함됩니다. 지난 라운드에는 나만
+// 여기서는 http.Client.Do의 반환 오류가 둔감해지고 누락되었습니다. 그 당시 "영구적인 실패 경로" 사용 사례가 추가되었습니다.
+// （file://、gopher://、ftp://）사실, 그들은 모두 될 수 있습니다 url.Parse 분석이 성공했으며 경로는 다음과 같습니다. scheme 나뭇가지，
+// 따라서 완전히 친환경적이라고 해서 이 길이 안전하다는 것을 증명하는 것은 아닙니다. 이는 잘못된 보장입니다.
 func TestValidateHTTPURLErrorNeverLeaksCredentials(t *testing.T) {
 	cases := []string{
-		"http://127.0.0.1/%zz?access_token=" + leakProbeToken,         // 非法百分号转义
-		"https://a.example.com:port/x?access_token=" + leakProbeToken, // 端口非数字
-		"http://[::1?access_token=" + leakProbeToken,                  // 括号不配对
+		"http://127.0.0.1/%zz?access_token=" + leakProbeToken,         // 잘못된 백분율 기호 이스케이프
+		"https://a.example.com:port/x?access_token=" + leakProbeToken, // 숫자가 아닌 포트
+		"http://[::1?access_token=" + leakProbeToken,                  // 괄호가 일치하지 않음
 	}
 	for _, raw := range cases {
-		// 先确认这个输入**确实**让 url.Parse 失败。不做这一步的话，用例可能在
-		// 毫无察觉的情况下走到别的分支（上一轮的假保证就是这么来的）。
+		// 먼저 이 입력이 **실제로** url.Parse를 실패하게 만드는지 확인하세요. 이 단계를 수행하지 않으면 사용 사례가 다음과 같을 수 있습니다.
+		// 자신도 모르게 다른 지점으로 이동합니다(마지막 라운드에서 허위 보장이 이렇게 발생했습니다).
 		if _, err := url.Parse(raw); err == nil {
-			t.Errorf("%q 本应解析失败，否则这条用例没有覆盖到目标分支", raw)
+			t.Errorf("%q는 구문 분석에 실패해야 합니다. 그렇지 않으면 이 사용 사례가 대상 분기를 다루지 않았습니다.", raw)
 			continue
 		}
 		err := validateHTTPURL(raw)
 		if err == nil {
-			t.Errorf("%q 应校验失败", raw)
+			t.Errorf("%q는 실패를 확인해야 합니다.", raw)
 			continue
 		}
 		assertNoSecret(t, err.Error(), leakProbeToken)
 	}
-	// 确认渠道层的包装也没有把地址带出去。
+	// 채널 수준의 패키징에 주소가 나오지 않는지 확인하세요.
 	t.Setenv(AllowLocalTargetsEnv, "")
 	err := (dingTalkChannel{}).Validate(map[string]any{"webhook": cases[0]})
 	if err == nil {
-		t.Fatal("非法地址应校验失败")
+		t.Fatal("잘못된 주소는 확인에 실패합니다.")
 	}
 	assertNoSecret(t, err.Error(), leakProbeToken)
 }
 
-// TestEmailDialGuardRejectsLoopbackByDefault 覆盖 SMTP 渠道的拨号守卫。
+// TestEmailDialGuardRejectsLoopbackByDefault는 SMTP 채널의 다이얼 가드를 덮습니다.
 //
-// 邮件渠道曾经用的是裸 net.Dialer，是整套 SSRF 防护里唯一的缺口：host 填成
-// 169.254.169.254 或 127.0.0.1 能直接连上，而 smtp.NewClient 握手失败时会把
-// 对端返回的那一行包进错误、经 last_error 由投递历史接口回显——正是其它渠道
-// 已经关掉的半盲读原语；「连接被拒 vs 超时」的耗时差异还能用来探测端口。
+// 이메일 채널은 SSRF 보호 전체 세트의 유일한 공백인 net.Dialer를 사용했습니다. host가 채워졌습니다.
+// 169.254.169.254 또는 127.0.0.1은 직접 연결할 수 있지만 smtp.NewClient는
+// 피어가 반환한 라인이 올바르지 않으며 last_error를 통한 전달 기록 인터페이스에 의해 에코됩니다. 이는 다른 채널입니다.
+// 반맹인 읽기 기본 기능이 꺼졌습니다. "연결 거부 vs 시간 초과"의 시간 차이를 사용하여 포트를 감지할 수도 있습니다.
 //
-// 本包的 TestMain 全局打开了 AllowLocalTargetsEnv（大量用例用 127.0.0.1 上的
-// 假接收端），所以这个用例必须自己把它清掉——否则守卫在不在都会通过，
-// 这也正是缺口当初没被任何测试发现的原因。
+// 이 패키지의 TestMain는 전 세계적으로 AllowLocalTargetsEnv를 엽니다(많은 사용 사례에서는 127.0.0.1을 사용합니다).
+// 가짜 수신기), 따라서 이 사용 사례에서는 자체적으로 삭제해야 합니다. 그렇지 않으면 가드 존재 여부에 관계없이 통과됩니다.
+// 애초에 어떠한 테스트에서도 격차가 발견되지 않은 이유가 여기에 있습니다.
 func TestEmailDialGuardRejectsLoopbackByDefault(t *testing.T) {
 	f := newFakeSMTP(t)
 	cfg := emailCfg(t, f, nil)
 
-	t.Setenv(AllowLocalTargetsEnv, "") // 关掉逃生口 = 默认行为
+	t.Setenv(AllowLocalTargetsEnv, "") // 탈출 해치 닫기 = 기본 동작
 	_, err := (emailChannel{}).Send(context.Background(), cfg, singleMsg())
 	if err == nil {
-		t.Fatal("默认不应允许把邮件投递到环回地址")
+		t.Fatal("루프백 주소로의 메일 배달은 기본적으로 허용되지 않습니다.")
 	}
-	// 连接根本不该建立：守卫在 Control 钩子里拦下，EHLO 永远发不出去。
+	// 연결이 전혀 설정되어서는 안 됩니다. 가드가 Control 후크에서 연결을 차단하고 EHLO가 전송되지 않습니다.
 	if f.sawCommand("EHLO") || f.sawCommand("HELO") {
-		t.Fatal("SMTP 会话已经建立——守卫没生效")
+		t.Fatal("SMTP 세션이 설정되었습니다. 가드가 적용되지 않습니다.")
 	}
-	// 错误信息要能指导用户怎么放开（本机 postfix 中继是合法配置）。
+	// 오류 메시지는 사용자에게 해제 방법을 안내할 수 있어야 합니다(이 기계의 postfix 릴레이는 합법적인 구성입니다).
 	if !strings.Contains(err.Error(), AllowLocalTargetsEnv) {
-		t.Errorf("拒绝信息应说明如何显式放开: %v", err)
+		t.Errorf("거부 메시지에는 %v를 명시적으로 해제하는 방법이 설명되어 있어야 합니다.", err)
 	}
 }
 
-// TestEmailDialGuardAllowsLoopbackWhenOptedIn 是配对的反向用例：显式打开后
-// 必须能正常投递。内网自建 SMTP / 本机中继是非常常见的部署，守卫不能一刀切。
+// TestEmailDialGuardAllowsLoopbackWhenOptedIn는 페어링의 반대 사용 사례입니다. 명시적으로 연 후
+// 정상적으로 배송이 가능해야 합니다. 자체 구축된 인트라넷 SMTP/로컬 릴레이는 매우 일반적인 배포이며 경비원은 모든 것에 적합할 수 없습니다.
 func TestEmailDialGuardAllowsLoopbackWhenOptedIn(t *testing.T) {
 	f := newFakeSMTP(t)
 	cfg := emailCfg(t, f, nil)
 
 	t.Setenv(AllowLocalTargetsEnv, "1")
 	if _, err := (emailChannel{}).Send(context.Background(), cfg, singleMsg()); err != nil {
-		t.Fatalf("显式放开后本机 SMTP 应可投递: %v", err)
+		t.Fatalf("명시적 릴리스 후 SMTP 머신은 다음을 제공할 수 있어야 합니다. %v", err)
 	}
 	if !f.sawCommand("EHLO") {
-		t.Fatal("未看到 EHLO——会话没真正建立")
+		t.Fatal("EHLO가 표시되지 않음 - 세션이 실제로 설정되지 않음")
 	}
 }

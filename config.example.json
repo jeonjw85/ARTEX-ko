@@ -1,7 +1,7 @@
 {
-  "_comment": "复制为 config.json（或用环境变量 ARTEX_CONFIG 指定其它路径）。本文件仅含 database 与 skill_dir 两项；LLM 等其余配置走环境变量或应用内设置，不在此文件。",
+  "_comment": "config.json으로 복사하거나 ARTEX_CONFIG 환경 변수로 다른 경로를 지정하세요. 이 파일은 database와 skill_dir만 설정합니다. LLM 등 나머지 설정은 환경 변수 또는 애플리케이션 화면에서 지정합니다.",
 
-  "_comment_database": "PostgreSQL 连接。优先级：环境变量 ARTEX_PG_DSN > 本文件 database。两种写法二选一：(A) 填下面的分字段；(B) 只填 database.dsn 一个完整连接串。",
+  "_comment_database": "PostgreSQL 연결 설정입니다. ARTEX_PG_DSN 환경 변수가 이 파일의 database 설정보다 우선합니다. (A) 아래 개별 필드를 입력하거나 (B) database.dsn에 전체 연결 문자열을 입력하세요.",
   "database": {
     "host": "127.0.0.1",
     "port": 5433,
@@ -11,13 +11,13 @@
     "sslmode": "disable"
   },
 
-  "_comment_database_dsn": "写法 (B)：删掉上面的 database，改用完整 DSN。dsn 非空时会忽略分字段。",
+  "_comment_database_dsn": "방식 (B): 위의 database 객체를 아래 DSN 방식으로 교체하세요. dsn 값이 비어 있지 않으면 host, port 등 개별 필드는 무시됩니다.",
   "_example_database_dsn": {
     "database": {
       "dsn": "postgres://user:pass@db.example.com:5432/artex?sslmode=require"
     }
   },
 
-  "_comment_skill_dir": "skill 根目录（每个子目录一个 skill，含 SKILL.md）。优先级：环境变量 ARTEX_SKILL_DIR > 本字段 > 默认（可执行文件同级的 skills/）。留空或删除本字段即用默认。相对路径相对当前工作目录解析。",
+  "_comment_skill_dir": "스킬 루트 디렉터리입니다. 각 하위 디렉터리는 SKILL.md를 포함한 스킬 하나를 담습니다. 우선순위는 ARTEX_SKILL_DIR 환경 변수 > 이 필드 > 실행 파일 옆의 skills/입니다. 비워 두거나 삭제하면 기본값을 사용합니다. 상대 경로는 현재 작업 디렉터리를 기준으로 해석합니다.",
   "skill_dir": "/opt/artex/skills"
 }

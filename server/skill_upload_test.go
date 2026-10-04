@@ -18,10 +18,10 @@ import (
 )
 
 func TestValidSkillName(t *testing.T) {
-	ok := []string{"web-recon", "a", "nuclei2", "中文技能", "端口扫描-x", "日本語スキル"}
+	ok := []string{"web-recon", "a", "nuclei2", "中文技能", "포트스캔-x", "일본어スキル"}
 	bad := []string{
-		"", "Web-Recon", "-lead", "trail-", "dou--ble", "has space", "中文 技能",
-		"dot.name", "a/b", `a\b`, "..", ".", "中文/技能", "sk\x00ill", "中‮文",
+		"", "Web-Recon", "-lead", "trail-", "dou--ble", "has space", "한국어 능력",
+		"dot.name", "a/b", `a\b`, "..", ".", "한국어/스킬", "sk\x00ill", "가운데‮기예",
 		strings.Repeat("a", 65), "1abc", "中文技能!",
 	}
 	for _, n := range ok {
@@ -40,10 +40,10 @@ func TestSkillRelPath(t *testing.T) {
 	ok := map[string]string{
 		"SKILL.md":           "SKILL.md",
 		"scripts/run.py":     "scripts/run.py",
-		"参考/中文说明.md":         "参考/中文说明.md",
+		"参考/한국어 설명.md":       "参考/한국어 설명.md",
 		"references/a b.txt": "references/a b.txt",
 		"./SKILL.md":         "SKILL.md",
-		"assets/图片-1_v2.png": "assets/图片-1_v2.png",
+		"assets/그림-1_v2.png": "assets/그림-1_v2.png",
 	}
 	for in, want := range ok {
 		got, msg := skillRelPath(in)
@@ -53,8 +53,8 @@ func TestSkillRelPath(t *testing.T) {
 	}
 	bad := []string{
 		"", "../etc/passwd", "a/../../b", "/abs/path", "a//b", `..\..\x`,
-		"%2e%2e/x", "a\x00b", "中文 名.md", "中‮文.md", "a#b.md", "a?b.md",
-		"a:b.md", string([]byte{0xd6, 0xd0}) + ".md", // 裸 GBK 字节：非法 UTF-8
+		"%2e%2e/x", "a\x00b", "한국어 이름.md", "가운데‮기예.md", "a#b.md", "a?b.md",
+		"a:b.md", string([]byte{0xd6, 0xd0}) + ".md", // 없는 GBK 바이트: 불법 UTF-8
 		strings.Repeat("a", maxSkillPathLen+1),
 	}
 	for _, in := range bad {
@@ -73,7 +73,7 @@ type zipFile struct {
 	name    string
 	body    string
 	method  uint16
-	nonUTF8 bool // write the name bytes as-is (GBK 包)
+	nonUTF8 bool // write the name bytes as-is (GBK 가방)
 }
 
 func buildZip(t *testing.T, files ...zipFile) []byte {
@@ -81,8 +81,8 @@ func buildZip(t *testing.T, files ...zipFile) []byte {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	zw.RegisterCompressor(zipMethodZstd, zstd.ZipCompressor())
-	// Deflate64 没有纯 Go 编码器；这里原样写入，只是为了给条目打上 method 9 的标记 ——
-	// 断言的是「方法不支持时给什么提示」，不会真去解压它。
+	// Deflate64 아니 순수 Go 인코더; 항목을 제공하기 위해 여기에 있는 그대로 작성되었습니다. method 9 표시 ——
+	// 주장하는 것은「방법이 지원되지 않으면 어떤 메시지가 표시됩니까?」，정말 압축이 풀리지 않을 거예요。
 	zw.RegisterCompressor(zipMethodDeflate64, func(w io.Writer) (io.WriteCloser, error) {
 		return nopWriteCloser{w}, nil
 	})
@@ -126,9 +126,9 @@ func uploadZip(t *testing.T, skillDir string, filename string, data []byte) (*ht
 	return rr, out
 }
 
-const zhSkillMD = "---\nname: 中文技能\ndescription: 测试\n---\n正文\n"
+const zhSkillMD = "---\nname: 中文技能\ndescription: 시험\n---\n본문\n"
 
-// A zstd-compressed archive (WinZip 的可选压缩方式) used to blow up with
+// A zstd-compressed archive (WinZip 선택적 압축 방법) used to blow up with
 // "zip: unsupported compression"; it now installs like any Deflate archive.
 func TestUploadSkillZstdAndChineseNames(t *testing.T) {
 	dir := t.TempDir()
@@ -151,7 +151,7 @@ func TestUploadSkillZstdAndChineseNames(t *testing.T) {
 	}
 }
 
-// GBK-named entries (7-Zip / 资源管理器 on Chinese Windows) must be decoded rather
+// GBK-named entries (7-Zip / 탐침 on Chinese Windows) must be decoded rather
 // than rejected as invalid UTF-8 paths.
 func TestUploadSkillGBKNames(t *testing.T) {
 	gbk := func(s string) string {
@@ -164,7 +164,7 @@ func TestUploadSkillGBKNames(t *testing.T) {
 	dir := t.TempDir()
 	data := buildZip(t,
 		zipFile{name: gbk("中文技能/SKILL.md"), body: zhSkillMD, method: zip.Deflate, nonUTF8: true},
-		zipFile{name: gbk("中文技能/参考资料.md"), body: "内容", method: zip.Deflate, nonUTF8: true},
+		zipFile{name: gbk("中文技能/参考资料.md"), body: "콘텐츠", method: zip.Deflate, nonUTF8: true},
 	)
 	rr, out := uploadZip(t, dir, "skill.zip", data)
 	if rr.Code != 201 {
@@ -189,7 +189,7 @@ func TestUploadSkillUnsupportedMethod(t *testing.T) {
 		t.Fatalf("status = %d, want 400 (body %s)", rr.Code, rr.Body)
 	}
 	msg, _ := out["error"].(string)
-	if !strings.Contains(msg, "Deflate64") || !strings.Contains(msg, "不支持的压缩方式") {
+	if !strings.Contains(msg, "Deflate64") || !strings.Contains(msg, "지원되지 않는 압축 방법") {
 		t.Fatalf("error = %q, want a Chinese message naming Deflate64", msg)
 	}
 }
@@ -210,8 +210,8 @@ func TestUploadSkillEncrypted(t *testing.T) {
 	if rr.Code != 400 {
 		t.Fatalf("status = %d, want 400 (body %s)", rr.Code, rr.Body)
 	}
-	if msg, _ := out["error"].(string); !strings.Contains(msg, "已加密") {
-		t.Fatalf("error = %q, want 加密 hint", msg)
+	if msg, _ := out["error"].(string); !strings.Contains(msg, "암호화되었습니다") {
+		t.Fatalf("error = %q, want 암호화 hint", msg)
 	}
 }
 
@@ -226,8 +226,8 @@ func TestUploadSkillRejectsTraversal(t *testing.T) {
 	if rr.Code != 400 {
 		t.Fatalf("status = %d, want 400 (body %s)", rr.Code, rr.Body)
 	}
-	if msg, _ := out["error"].(string); !strings.Contains(msg, "非法路径") {
-		t.Fatalf("error = %q, want 非法路径", msg)
+	if msg, _ := out["error"].(string); !strings.Contains(msg, "잘못된 경로") {
+		t.Fatalf("error = %q, want 불법적인 경로", msg)
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
 		t.Fatalf("upload left files behind: %v", entries)

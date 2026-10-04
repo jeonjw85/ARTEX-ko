@@ -1,44 +1,44 @@
 # syntax=docker/dockerfile:1
 #
-# 运行镜像（不在镜像里编译）：只装常用工具，放入**预编译好的 Linux 单二进制**。
-# 二进制由 CI 的 binaries job 交叉编译（纯 Go、无 QEMU），按目标架构放在
-# 构建上下文的 dist/<TARGETARCH>/artex。这样多架构构建时 arm64 只需模拟 apt 层，
-# 不再模拟 Next/Go 编译，速度快得多。
+# 이미지 실행(이미지에서 컴파일하지 않음): 일반 도구만 설치하고**미리 컴파일된 Linux 단일 바이너리**。
+# 바이너리 기준 CI ~의 binaries job 크로스 컴파일(순수 Go、없음 QEMU），대상 아키텍처에 따라 배치
+# 맥락 구축 dist/<TARGETARCH>/artex。이러한 다중 아키텍처를 구축할 때 arm64 그냥 시뮬레이션해 보세요 apt 층，
+# 더 이상 시뮬레이션이 필요하지 않습니다. Next/Go 훨씬 더 빠른 컴파일。
 #
-# 本地手动构建镜像时，先自行准备二进制：
+# 로컬에서 이미지를 수동으로 빌드하는 경우 먼저 바이너리를 직접 준비하세요.：
 #   cd web && npm run build:static && cd ..
 #   cp -r web/out server/webui/dist
 #   CGO_ENABLED=0 GOARCH=amd64 go build -tags embedui -o dist/amd64/artex ./cmd/artex
 #   docker build -t artex:local .
 FROM python:3.12-slim-bookworm
 ARG TARGETARCH
-# 常用工具：ripgrep / curl / vim，加一批 recon 常备件（按需增删）。
-# Node 从 NodeSource 装 20.x：bookworm 自带的 apt nodejs 是 18，Playwright 要求 >=20。
+# 일반적인 도구：ripgrep / curl / vim，배치 추가 recon 일반 예비 부품(필요에 따라 추가 또는 삭제)）。
+# Node ~에서 NodeSource 팩 20.x：bookworm 함께 제공됩니다 apt nodejs 예 18，Playwright 필요하다 >=20。
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates ripgrep curl wget vim git jq unzip \
       dnsutils iputils-ping netcat-openbsd inetutils-telnet whois nmap \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
-# 预装 Playwright MCP 与 CLI（全局），运行时不再 npx 联网下载。
-# @playwright/mcp：browser MCP 直接 `npx @playwright/mcp`（已全局装好，无需 -y/@latest）。
-# @playwright/cli：提供 playwright-cli，装完顺带 --help 验证可执行。
-# 再装 playwright（提供浏览器管理），装完用 --with-deps 预置 chromium 及其系统依赖，
-# 这样容器内 MCP/CLI 首次启动即可用，不再联网下载浏览器。
+# 사전 설치됨 Playwright MCP 그리고 CLI（전역), 더 이상 런타임에 없음 npx 인터넷 다운로드。
+# @playwright/mcp：browser MCP 직접 `npx @playwright/mcp`（이미 전역적으로 설치되어 있으므로 필요하지 않습니다. -y/@latest）。
+# @playwright/cli：공급 playwright-cli，그런데 설치 후에는 --help 실행 파일 확인。
+# 재설치 playwright（브라우저 관리 제공), 설치 후 사용 --with-deps 프리셋 chromium 및 시스템 종속성，
+# 이 용기에는 MCP/CLI 처음 시작할 때 사용할 수 있으며 온라인으로 브라우저를 다운로드할 필요가 없습니다.。
 RUN npm install -g @playwright/mcp@latest @playwright/cli@latest playwright@latest \
     && playwright-cli --help \
     && playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-# 预编译好的对应架构二进制（dist/amd64/artex 或 dist/arm64/artex）
+# 사전 컴파일된 해당 아키텍처 바이너리（dist/amd64/artex 또는 dist/arm64/artex）
 COPY dist/${TARGETARCH}/artex /app/artex
-# 守护启动脚本：进程退出后按退出码决定是否重新拉起，页面一键更新靠它完成换装。
-# 它同时负责把 SIGTERM 转发给 artex —— docker stop 只把信号发给 PID 1，
-# 不转发的话 artex 收不到、做不了优雅关闭，10 秒后被 SIGKILL 硬杀。
+# Guardian 시작 스크립트: 프로세스가 종료된 후 종료 코드를 눌러 다시 시작할지 여부를 결정하고 이에 따라 페이지의 원클릭 업데이트를 완료합니다.。
+# 또한 책임이 있습니다 SIGTERM 앞으로 artex —— docker stop 다음으로만 신호를 보냅니다. PID 1，
+# 전달하지 않으면 artex 정상적으로 수신하고 닫을 수 없습니다.，10 몇 초 후 SIGKILL 하드 킬。
 COPY start.sh /app/start.sh
 RUN chmod +x /app/artex /app/start.sh
 COPY skills/ /app/skills/
-# data/（SQLite + jwt.key）持久化点
+# data/（SQLite + jwt.key）지속성 지점
 VOLUME ["/app/data"]
 EXPOSE 8787 8788
 ENTRYPOINT ["/app/start.sh"]

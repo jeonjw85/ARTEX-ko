@@ -1,38 +1,38 @@
-# `/btw` 验证记录
+# `/btw` 검증 기록
 
-日期：2026-09-10。分支：`codex/btw-side-question`。基线：`8dae851b9b622f2ff2631f332fde9719d0b16fba`。
+날짜: 2026-09-10. 분기: `codex/btw-side-question`. 기준선: `8dae851b9b622f2ff2631f332fde9719d0b16fba`.
 
-使用独立 PostgreSQL 测试库和数据目录；真实模型凭据只注入独立测试环境，没有写入代码或此记录，也没有修改产品默认模型。Go 1.26.3、norma v0.3.6、Next.js 16.2.9。
+독립적인 PostgreSQL 테스트 라이브러리 및 데이터 디렉토리를 사용하십시오. 실제 모델 자격 증명은 독립 테스트 환경에만 주입되며 코드나 이 기록은 작성되지 않으며 제품 기본 모델은 수정되지 않습니다. Go 1.26.3, norma v0.3.6, Next.js 16.2.9.
 
-实际模型对话、返回对象、工程断言及 Qwen 原始审查文本保存在 [validation-2026-09-10.json](validation-2026-09-10.json)，其中没有 API 凭据。
+Qwen에 대한 실제 모델 대화, 반환 개체, 엔지니어링 어설션 및 원래 검토 텍스트는 API 자격 증명이 없는 [validation-2026-09-10.json](validation-2026-09-10.json)에 저장됩니다.
 
-## 工程检查
+## 엔지니어링 검사
 
-| 范围 | 结果 | 证据 |
+| 범위 | 결과 | 증거 |
 | --- | --- | --- |
-| 结构化消息、工具参数深拷贝 | 通过 | `TestCheckpointDeepCopyAndBoundaries` |
-| 摘要 / 压缩请求不覆盖、完整回复和终态发布、半段回复排除 | 通过 | `TestCheckpointDeepCopyAndBoundaries`、`TestSnapshotExcludesPartialStreamAndSelectsPoolMember` |
-| 实际模型池成员身份 | 通过 | `TestSnapshotExcludesPartialStreamAndSelectsPoolMember` |
-| 工具配对、20 组回放、预算裁剪与超限错误 | 通过 | `TestBuildRequestCompactionToolPairingAndBudget` |
-| 主旁路并行、双向取消隔离 | 通过 | 阻塞式 Provider，`TestMainSideConcurrencyAndIndependentCancellation` |
-| 无工具执行、流式 / 非流式、失败时已有用量 | 通过 | `TestServiceNoToolsAndUsageOnFailure` |
-| 真实 norma ChatAgent + 本地 Read 工具、主 transcript / 活动隔离 | 通过 | `TestSideActualChatCheckpointToolResultAndTranscriptIsolation`，流式和非流式子用例 |
-| 持久化、分页、幂等、重启保留部分回答 | 通过 | `TestSideHistoryIdempotencyPagingAndRecovery` |
-| 清空与迟到写入竞争、父资源删除、版本比较 | 通过 | `TestSideClearLateWritersAndDeletedParent` |
-| MainAgent / Worker 归档与恢复，v1/v2/v3 | 通过 | `TestSideTaskArchiveVersions` |
-| 三种父接口、认证、资源归属、Worker 逻辑删除 | 通过 | `TestSideHTTPGlobalLimitTaskWorkerAndDeletion`、`TestSideCheckpointPersistsBeforeAdmissionAndRestart` |
-| 忙碌主会话可旁路、独立 SSE 重连 / 断开、取消、清空 | 通过 | `TestSideHTTPBusyIsolationClearAndReconnect` |
-| 每父会话 1 / 全局 4 并发 | 通过 | 两个 `TestSideHTTP…` 用例 |
-| 提交前快照落库、重启续问、旧会话不可伪造快照 | 通过 | `TestSideCheckpointPersistsBeforeAdmissionAndRestart` |
-| 缓存中的配置被删除或模型改变后拒绝继续 | 通过 | `TestSideRejectsDeletedOrChangedCachedProfile` |
-| 归档前取消并等待最终回答和用量落库 | 通过 | `TestSideTaskDrainPersistsBeforeArchive` |
-| 流式消费者提前取消时只记一次用量及旁路归属 | 通过 | `TestSideUsageRecordedOnceOnConsumerCancellation` |
-| 重启自动恢复的 Worker / deadline 运行上下文继续发布新快照 | 通过 | `TestSideRestoredWorkerRuntimePublishesNewCheckpoint` |
-| 相关包 race 检查 | 通过 | 下列命令 |
-| TypeScript 与生产构建 | 通过 | `npx tsc --noEmit`、`npm run build` |
-| 新增前端模块 Biome | 通过 | `biome check`，3 个新增模块 |
+| 구조화된 메시지 및 도구 매개변수 딥 카피 | 통과하다 | `TestCheckpointDeepCopyAndBoundaries` |
+| 요약/압축 요청은 다루지 않으며 완전한 답변과 최종 상태 공개는 제외되고 반문단 답변은 제외됩니다. | 통과하다 | `TestCheckpointDeepCopyAndBoundaries`、`TestSnapshotExcludesPartialStreamAndSelectsPoolMember` |
+| 실제 모델 풀 멤버십 | 통과하다 | `TestSnapshotExcludesPartialStreamAndSelectsPoolMember` |
+| 도구 페어링, 20그룹 재생, 예산 삭감 및 한도 초과 오류 | 통과하다 | `TestBuildRequestCompactionToolPairingAndBudget` |
+| 메인 바이패스 병렬, 양방향 분리 | 통과하다 | 차단된 Provider, `TestMainSideConcurrencyAndIndependentCancellation` |
+| 도구 실행 없음, 스트리밍/비스트리밍, 실패 시 이미 사용됨 | 통과하다 | `TestServiceNoToolsAndUsageOnFailure` |
+| 실제 norma ChatAgent + 로컬 Read 도구, 마스터 transcript/활성 격리 | 통과하다 | `TestSideActualChatCheckpointToolResultAndTranscriptIsolation`, 스트리밍 및 비스트리밍 하위 사용 사례 |
+| 지속성, 페이징, 멱등성 및 다시 시작에 일부 답변이 유지됩니다. | 통과하다 | `TestSideHistoryIdempotencyPagingAndRecovery` |
+| 비어 있음 및 지연 쓰기 경쟁, 상위 리소스 삭제, 버전 비교 | 통과하다 | `TestSideClearLateWritersAndDeletedParent` |
+| MainAgent / Worker 보관 및 복원, v1/v2/v3 | 통과하다 | `TestSideTaskArchiveVersions` |
+| 3개의 상위 인터페이스, 인증, 리소스 소유권, Worker 논리적 삭제 | 통과하다 | `TestSideHTTPGlobalLimitTaskWorkerAndDeletion`、`TestSideCheckpointPersistsBeforeAdmissionAndRestart` |
+| 바쁜 메인 세션을 우회할 수 있으며 독립적인 SSE 재연결/연결 끊기, 취소, 지우기 가능 | 통과하다 | `TestSideHTTPBusyIsolationClearAndReconnect` |
+| 상위 세션당 1개/전역적으로 4개 동시성 | 통과하다 | 두 가지 `TestSideHTTP…` 사용 사례 |
+| 스냅샷은 제출 전에 데이터베이스에 삭제되고, 계속하려면 다시 시작해야 하며, 이전 세션의 스냅샷은 위조할 수 없습니다. | 통과하다 | `TestSideCheckpointPersistsBeforeAdmissionAndRestart` |
+| 캐시의 구성이 삭제되거나 모델이 변경된 후 계속을 거부합니다. | 통과하다 | `TestSideRejectsDeletedOrChangedCachedProfile` |
+| 보관하기 전에 취소하고 최종 답변과 사용량이 데이터베이스에 포함될 때까지 기다립니다. | 통과하다 | `TestSideTaskDrainPersistsBeforeArchive` |
+| 스트리밍 소비자가 사전에 취소할 경우 사용량과 바이패스 어트리뷰션은 1회만 기록됩니다. | 통과하다 | `TestSideUsageRecordedOnceOnConsumerCancellation` |
+| 새 스냅샷 게시를 계속하려면 자동으로 복원된 Worker/deadline 실행 컨텍스트를 다시 시작하세요. | 통과하다 | `TestSideRestoredWorkerRuntimePublishesNewCheckpoint` |
+| 관련 패키지 race 확인 | 통과하다 | 다음 명령 |
+| 프로덕션 빌드가 포함된 TypeScript | 통과하다 | `npx tsc --noEmit`、`npm run build` |
+| 새로운 프런트엔드 모듈 Biome | 통과하다 | `biome check`, 3개의 새로운 모듈 |
 
-在单独的可丢弃数据库中配置 `ARTEX_PG_DSN` 后，可以复现自动化检查（不要指向生产库）：
+별도의 일회용 데이터베이스에 `ARTEX_PG_DSN`를 구성한 후 자동 검사를 재현할 수 있습니다(프로덕션 데이터베이스를 가리키지 않음).
 
 ```sh
 go test -race ./agent ./db ./server ./sidequestion ./llmrec ./llmpool \
@@ -43,51 +43,51 @@ npx biome check src/lib/side-questions.ts src/hooks/use-side-questions.ts src/co
 npm run build
 ```
 
-全量 Go 回归不是全绿：`server` 包有两个既有测试在临时目录清理阶段失败，均报 `TempDir RemoveAll … directory not empty`：
+전체 Go 반환이 모두 녹색이 아닙니다. `server` 패키지에 대한 두 가지 기존 테스트가 임시 디렉터리 정리 단계에서 실패했으며 둘 다 `TempDir RemoveAll … directory not empty`를 보고했습니다.
 
 - `TestInheritedActivityDetailAndRelationDeletion`
 - `TestTaskMetadataPatchReturnsRenameAndPin`
 
-从上述未修改基线导出源码后，在相同隔离环境重跑 `server` 包，也复现这两个清理失败。基线运行另出现 `TestCoreTaskLifecyclePG` 的目标节点数量断言失败；最终修改后的 `server` 回归没有该断言失败。其他包通过，本次旁路相关用例及 race 检查通过。没有将基线问题标为本次验收通过，也没有为隐藏问题修改既有断言。
+위의 수정되지 않은 기준선에서 소스 코드를 내보낸 후 동일한 격리 환경에서 `server` 패키지를 다시 실행하면 두 가지 정리 실패도 재현되었습니다. 기준 실행에서는 `TestCoreTaskLifecyclePG`에 대한 대상 노드 번호 어설션 실패도 표시되었습니다. 최종 수정된 `server` 회귀에는 이러한 주장 실패가 없었습니다. 다른 패키지도 통과했고 우회 관련 사용 사례와 race 검사도 통과했습니다. 이 승인에 대해 기본 문제는 통과된 것으로 표시되지 않으며 숨겨진 문제에 대해 기존 주장도 수정되지 않습니다.
 
-Next.js 构建输出已有的多 lockfile / workspace root 推断警告；构建完成且所有页面生成成功。
+Next.js 빌드는 기존의 여러 lockfile / workspace root 추론 경고를 출력합니다. 빌드가 완료되고 모든 페이지가 성공적으로 생성됩니다.
 
-## 浏览器检查
+## 브라우저 확인
 
-使用 Codex In-app Browser，连接独立本地 Go 服务和 Next.js 开发服务器。桌面与 390 × 844 窄屏完成以下人工自动化操作，检查截图和浏览器日志：
+Codex In-app Browser를 사용하여 독립형 로컬 Go 서비스와 Next.js 개발 서버를 연결합니다. 데스크탑 및 390 × 844 좁은 화면은 다음 수동 자동화 작업을 완료하고 스크린샷 및 브라우저 로그를 확인합니다.
 
-- 普通聊天运行期间输入 `/btw`，主内容和旁路同时显示；桌面侧栏正常。
-- 连续追问；旁路停止后保留已生成部分；主流程继续。
-- 关闭面板时请求继续，重开后恢复完成的回答；刷新页面后空 `/btw` 恢复历史。
-- 窄屏 Drawer 的输入、按钮、历史和关闭操作正常，无横向溢出。
-- 清空使用确认弹窗，清空后历史消失，主 transcript 和快照保留。
-- 任务 MainAgent 与两个 Worker 分别提问并切换，Agent 标签和历史未串话。
-- 阻塞式本地模型夹具保持 Worker 运行；从 Worker 主输入框提交 `/btw`，停止旁路后 Worker 仍显示实时运行和自己的暂停按钮，旁路保存部分回答。
-- 浏览器错误 / 警告日志为空。
+- 일반 채팅이 실행 중일 때 `/btw`를 입력하면 메인 콘텐츠와 바이패스가 동시에 표시됩니다. 데스크탑 사이드바는 정상입니다.
+- 지속적인 질문; 바이패스가 중지된 후에도 생성된 부분을 유지합니다. 주요 프로세스가 계속됩니다.
+- 패널이 닫혀도 요청은 계속되고 다시 열면 완료된 답변이 복원됩니다. 비어 있는 `/btw`는 페이지를 새로 고친 후 기록을 복원합니다.
+- 좁은 화면 Drawer의 입력, 버튼, 기록 및 닫기 작업은 수평 오버플로 없이 잘 작동합니다.
+- 사용 확인 팝업 창을 지웁니다. 삭제 후에는 기록이 사라지고 기본 transcript 및 스냅샷이 유지됩니다.
+- 태스크 MainAgent와 두 개의 Worker가 질문을 하고 따로 전환했습니다. Agent 태그와 기록이 혼선되지 않았습니다.
+- 차단 로컬 모델 고정 장치는 Worker 실행을 유지합니다. Worker 기본 입력 상자에서 `/btw`를 제출하고 바이패스를 중지한 후에도 Worker는 여전히 실시간 실행 및 자체 일시 중지 버튼을 표시하며 바이패스는 부분 응답을 저장합니다.
+- 브라우저 오류/경고 로그가 비어 있습니다.
 
-可控夹具用于精确验证并发时序，不依赖真实模型的输出速度。调试期间两次 Worker 运行时检查未形成有效并发窗口（任务已结束 / 回答提前结束），修正夹具后重做并通过；不将这些初始操作记作有效通过。
+실제 모델의 출력 속도에 의존하지 않고 동시 타이밍을 정확하게 검증하기 위해 제어 가능한 고정 장치가 사용됩니다. 디버깅 중에 두 개의 Worker 런타임 검사가 유효한 동시성 창(작업 종료/응답이 조기 종료됨)을 형성하지 않았으며 픽스처를 수정하고 다시 실행하여 통과했습니다. 이러한 초기 작업은 유효한 패스로 기록되지 않습니다.
 
-## 真实模型对话
+## 실제 모델 대화
 
-优先探测 `grok-4.6`，OpenAI 兼容接口 `http://127.0.0.1:12580/tingly/openai`。探测 HTTP 200，返回模型名 `grok-4.6` 和 `READY`，耗时 2.82 秒。首选可用，因此没有启用 Tingly `glm` 或智谱 `glm-5.3` 备用链；这两个备用服务本次没有验证。
+`grok-4.6`, OpenAI 호환 인터페이스 `http://127.0.0.1:12580/tingly/openai`의 감지를 우선적으로 수행합니다. HTTP 200을 감지하고 모델 이름 `grok-4.6` 및 `READY`를 반환합니다. 이 작업에는 2.82초가 걸립니다. 첫 번째 선택을 사용할 수 있으므로 Tingly `glm` 또는 Zhipu `glm-5.3` 백업 체인은 활성화되지 않습니다. 이번에는 이 두 가지 백업 서비스가 확인되지 않았습니다.
 
-| 场景 | 实际结果 |
+| 장면 | 실제 결과 |
 | --- | --- |
-| 主会话运行期间询问资产、目标、标记 | 返回 `redhaze.top`、首页读取和总结目标、`BTW-REAL-0910`；旁路完成，16.97 秒 |
-| 主会话完成首页读取后询问工具依据 | 正确引用 WebFetch 200、curl 跳转 301 → 302 → 200、页面标题；7.24 秒 |
-| 旁路要求 Bash 创建测试文件 | 拒绝执行，目标文件未创建；7.74 秒 |
-| 完成后的旁路不改变主上下文 | 主 transcript SHA-256 与主活动记录保持一致；旁路工具执行次数为 0 |
-| 真正停止 / 重启 Go 服务后续问 | 保留先前 3 条旁路历史，直接从持久化快照回答资产、标记和标题，未重跑主 Agent |
-| 新会话使用 Grok 非流式配置 | 正确回答资产和 `ATOMIC-0910`；返回并保存用量：input 11734、output 138、cache_read 11520 |
+| 기본 세션 실행 중 자산, 대상, 태그 요청 | `redhaze.top`, 홈 페이지 읽기 및 요약 대상 `BTW-REAL-0910`로 돌아갑니다. 우회 완료, 16.97초 |
+| 메인 세션이 홈 페이지 읽기를 완료한 후 도구에 기초를 요청합니다. | 올바르게 인용됨 WebFetch 200, curl 점프 301 → 302 → 200, 페이지 제목; 7.24초 |
+| 우회 요구 사항 Bash 테스트 파일 생성 | 실행이 거부되었습니다. 대상 파일이 생성되지 않았습니다. 7.74초 |
+| 완료된 우회는 기본 컨텍스트를 변경하지 않습니다. | 기본 transcript SHA-256는 기본 활동 기록과 일치합니다. 우회 도구 실행 횟수는 0입니다. |
+| Go 서비스를 중지/다시 시작하시겠습니까? 후속 질문 | 기본 Agent를 다시 실행하지 않고도 이전 3개의 우회 기록을 보존하고 영구 스냅샷에서 직접 자산, 태그 및 제목에 응답합니다. |
+| 새 세션에서는 Grok 비스트리밍 구성을 사용합니다. | 자산과 `ATOMIC-0910`에 올바르게 대답하십시오. 반환하고 사용량을 저장합니다: input 11734, output 138, cache_read 11520 |
 
-资产案例的主会话使用 WebFetch 和 Bash/curl 读取公开首页，落地页为 `https://id.redhaze.top/home`，标题为“红幕科技 RedHaze Group · 全球综合集团门户”。Bash 把响应暂存于本地测试文件；未向远端执行写入。该事实与“旁路没有执行工具”分开核验。
+자산 사례의 메인 세션은 WebFetch 및 Bash/curl를 사용하여 공개 홈페이지를 읽고 랜딩 페이지는 `https://id.redhaze.top/home`이며 제목은 "Red Curtain Technology RedHaze Group·Global Comprehensive Group Portal"입니다. Bash 응답은 로컬 테스트 파일에 임시 저장됩니다. 원격 끝에는 쓰기가 수행되지 않습니다. 이 사실은 "Bypass에는 실행 도구가 없습니다"와 별도로 확인됩니다.
 
-主 transcript 校验值：`e7e61f135a4a120954b539f357e8c4205d7d5cd7460dcaf3dc0fd066463e1d00`。
+메인 transcript 확인 값: `e7e61f135a4a120954b539f357e8c4205d7d5cd7460dcaf3dc0fd066463e1d00`.
 
-**用量限制：** Tingly 的 Grok 流式响应没有返回 usage。另行直接发送 `stream_options.include_usage=true` 验证，HTTP 200、12 个数据帧、0 个 usage 帧。因此流式测试中的 0 表示端点没有提供用量，不能解释为没有计费。非流式用量以及夹具的失败 / 取消用量都正确保存。
+**사용 제한:** Tingly에 대한 Grok 스트리밍 응답이 usage를 반환하지 않았습니다. 별도로 검증을 위해 `stream_options.include_usage=true`, HTTP 200, 12 데이터 프레임 및 0 usage 프레임을 직접 보냅니다. 따라서 스트리밍 테스트에서 0은 엔드포인트가 사용량을 제공하지 않으며 청구가 없는 것으로 해석될 수 없음을 나타냅니다. 흐르지 않는 사용 및 설비의 실패/취소된 사용이 올바르게 저장됩니다.
 
-## Qwen 审查
+## Qwen 리뷰
 
-审查模型 `qwen-flash`，OpenAI 兼容接口 `https://dashscope.aliyuncs.com/compatible-mode/v1`，HTTP 200。提供了前三项真实旁路对话、主会话工具依据及工程断言；返回 `verdict: accept`、`concerns: []`，认为回答与资产、标记、页面读取证据一致，旁路工具拒绝符合约束。审查用量：prompt 6625、completion 312、total 6937。
+검토 모델 `qwen-flash`, OpenAI 호환 인터페이스 `https://dashscope.aliyuncs.com/compatible-mode/v1`, HTTP 200. 처음 3개의 실제 우회 대화, 기본 대화 도구 기반 및 엔지니어링 어설션이 제공됩니다. `verdict: accept` 및 `concerns: []`가 반환되고 답변은 자산, 태그 및 페이지 읽기 증거와 일치하는 것으로 간주되며 우회 도구는 제약 조건 준수를 거부합니다. 복용량 검토: prompt 6625, completion 312, total 6937.
 
-这次 Qwen 审查范围不包含后来追加的服务重启和非流式测试。Qwen 对“无写入”的概括过宽：主会话 curl 确实创建了本地响应临时文件，上文已明确记录。并发、零工具执行和 transcript 隔离由工程断言判断，模型审查只辅助评估答案质量。
+이 Qwen 검토 범위에는 나중에 추가된 서비스 다시 시작 및 비스트리밍 테스트가 포함되지 않습니다. Qwen의 "쓰기 없음" 일반화는 너무 광범위합니다. 기본 세션 curl는 위에 명시적으로 문서화된 로컬 응답 임시 파일을 생성합니다. 동시성, 제로 도구 실행 및 transcript 격리는 엔지니어링 주장에 따라 판단되며 모델 검토는 답변 품질 평가에만 도움이 됩니다.

@@ -12,18 +12,18 @@ import (
 	"github.com/Autumn-27/artex/db"
 )
 
-// 任务级超时协调器(见 docs/任务级超时与收尾设计.md §4/§8.5)。
-// 绝对墙钟:每个带 timeout 的任务一个定时 goroutine,到点驱动有序收尾时序:
-//   ① settling → ② worker 停领新意图 / ③ planner 丢弃普通 notify
-//   ④ 等在跑 worker drain(受 grace) → ⑤ 终局一轮 planner 判定 → ⑥ 定终态(带守卫)
+// 작업 수준 제한 시간 조정자(docs/ 작업 수준 제한 시간 및 종료 설계.md §4/§8.5 참조)
+// 절대 벽시계: timeout가 있는 각 작업에는 타이밍 goroutine가 있으며 포인트 드라이버는 종료 타이밍을 주문합니다.
+//   ① settling → ② worker 새로운 의도 수신 중지 / ③ planner 일반 notify 폐기
+//   ④ worker drain 실행 대기 중(grace로 수신) → ⑤ 최종 라운드 planner 판정 → ⑥ 최종 상태(가드 있음)
 
 const (
-	settleDrainGrace     = 90 * time.Second // 等在跑 worker 优雅收尾的上限;超过则硬 cancel
-	deadlinePollInterval = 2 * time.Second  // deadline 未盖章/LLM 未就绪时的轮询间隔
-	deadlineMaxSleep     = 30 * time.Second // 单次最长睡眠(便于周期复查终态)
+	settleDrainGrace     = 90 * time.Second // worker 실행 대기 중 우아한 엔딩의 상한; 초과하면 힘들어요 cancel
+	deadlinePollInterval = 2 * time.Second  // deadline 스탬프가 찍히지 않음/LLM 준비되지 않은 경우 폴링 간격
+	deadlineMaxSleep     = 30 * time.Second // 단일 시간 중 가장 긴 수면(최종 상태에 대한 주기적인 검토 촉진)
 )
 
-// ---------- settling 状态 ----------
+// ---------- settling 상태 ----------
 
 func (e *Engine) isSettling(taskID string) bool {
 	v, _ := e.settling.Load(taskID)
@@ -37,7 +37,7 @@ func (e *Engine) markSettling(taskID string) bool {
 	return !loaded
 }
 
-// ---------- 在跑计数(worker.Execute + planner.Plan),用于 drain ----------
+// ---------- drain에 사용되는 실행 횟수(worker.Execute + planner.Plan) ----------
 
 func (e *Engine) inflightCounter(taskID string) *int64 {
 	v, _ := e.inflight.LoadOrStore(taskID, new(int64))
@@ -102,13 +102,13 @@ func (e *Engine) stampFirstRun(t *Task) {
 	}
 	dl, err := e.m.StampTaskFirstRun(t.ID)
 	if err != nil {
-		log.Printf("[deadline] task %s 盖章 first_run 失败: %v", t.ID, err)
-		e.stamped.Delete(t.ID) // 允许下次重试
+		log.Printf("[deadline] task %s 우표 first_run 실패: %v", t.ID, err)
+		e.stamped.Delete(t.ID) // 다음에 재시도 허용
 		return
 	}
 	if dl > 0 {
 		e.deadline.Store(t.ID, dl)
-		log.Printf("[deadline] task %s 首次运行,截止于 %s", t.ID, time.Unix(dl, 0).Format("2006-01-02 15:04:05"))
+		log.Printf("[deadline] task %s 첫 번째 실행,현재 %s", t.ID, time.Unix(dl, 0).Format("2006-01-02 15:04:05"))
 	}
 }
 
@@ -123,7 +123,7 @@ func (e *Engine) clockCtx(base context.Context, t *Task, final bool) context.Con
 	return agent.WithTaskClock(base, agent.TaskClock{DeadlineUnix: dl, Final: final})
 }
 
-// ---------- 协调器 ----------
+// ---------- 코디네이터 ----------
 
 // startDeadlineCoordinator launches the per-task deadline timer once (idempotent).
 // Called from Run() and from the restart reload path, so non-active timeout tasks
@@ -185,32 +185,32 @@ func (e *Engine) settleTask(ctx context.Context, t *Task) {
 	if !e.markSettling(t.ID) {
 		return
 	}
-	log.Printf("[deadline] task %s 到达超时上限,进入收尾时序", t.ID)
+	log.Printf("[deadline] task %s 시간 초과 한도에 도달했습니다.,마감순서 들어가기", t.ID)
 
-	// ④ 等在跑 worker/planner drain(在跑 run 因夹逼的 MaxDuration 自行进收尾);
-	// 超过 grace 仍未清空 → 硬 cancel 该任务 exec ctx(settling-aware 分支正确归类)。
+	// ④ worker/planner drain를 기다리는 중(MaxDuration의 핀치로 인해 run 실행);
+	// grace 초과 후에도 클리어되지 않음 → 하드 cancel 태스크 exec ctx (settling-aware 분기가 올바르게 분류됩니다.)
 	hardStop := time.Now().Add(settleDrainGrace)
 	for e.inflightCount(t.ID) > 0 {
 		if time.Now().After(hardStop) {
-			log.Printf("[deadline] task %s drain 超时(%s),硬取消在跑 run", t.ID, settleDrainGrace)
+			log.Printf("[deadline] task %s drain 타임아웃(%s),강제 취소 실행 중 run", t.ID, settleDrainGrace)
 			e.cancelExec(t.ID, agent.AbortSettleDrainTimeout)
-			_ = sleepCtx(ctx, 3*time.Second) // 给 worker 分支一点时间落库/归类
+			_ = sleepCtx(ctx, 3*time.Second) // worker 지점에 로그인/분류할 시간을 주세요.
 			break
 		}
 		if sleepCtx(ctx, 500*time.Millisecond) {
-			return // 引擎整体关停
+			return // 엔진 전체가 정지됨
 		}
 	}
 
-	// ⑤ 终局一轮 planner(任务超时词,最后目标判定,不产新意图)。
+	// ⑤ 최종 라운드 planner(작업 시간 초과 단어, 최종 목표 결정, 새로운 의도 없음).
 	met := e.runFinalPlannerRound(ctx, t)
 	if !e.beginTaskOperation(t.ID) {
 		return
 	}
 	defer e.decInflight(t.ID)
 
-	// ⑥ 定终态(带守卫):met → done(completed);否则 timeout。若常规路径已先落 done,
-	// 守卫(SetTaskStatusGuarded)会拒绝覆盖,保留 completed 语义。
+	// ⑥ 최종 상태(가드 포함): met → done(completed); 그렇지 않으면 timeout. 일반 경로가 먼저 done로 떨어진 경우,
+	// 가드(SetTaskStatusGuarded)는 덮어쓰기를 거부하고 completed의 의미를 유지합니다.
 	status := "timeout"
 	if met {
 		status = "done"
@@ -218,11 +218,11 @@ func (e *Engine) settleTask(ctx context.Context, t *Task) {
 	won, err := e.m.SetTaskStatusGuarded(t.ID, status)
 	switch {
 	case err != nil:
-		log.Printf("[deadline] task %s 落终态失败: %v", t.ID, err)
+		log.Printf("[deadline] task %s 최종 상태 실패: %v", t.ID, err)
 	case won:
-		log.Printf("[deadline] task %s 收尾完成,终态=%s", t.ID, status)
+		log.Printf("[deadline] task %s 마무리 완료,최종 상태=%s", t.ID, status)
 	default:
-		log.Printf("[deadline] task %s 收尾时已是终态,保留原状态", t.ID)
+		log.Printf("[deadline] task %s 결말은 최종 상태입니다,그대로 두세요", t.ID)
 	}
 }
 
@@ -246,7 +246,7 @@ func (e *Engine) runFinalPlannerRound(ctx context.Context, t *Task) (met bool) {
 		}
 		planner, _ = e.snapshotFor(t)
 	}
-	// 独立 ctx(不挂 execCancel,避免 pause/硬 cancel 打断这最后一轮),带 Final 注入任务超时词。
+	// 독립적인 ctx(pause/ 하드 cancel가 이 마지막 라운드를 중단하는 것을 방지하기 위해 execCancel에 연결되지 않음), Final를 사용하여 작업 시간 초과 단어를 삽입합니다.
 	fctx := e.clockCtx(ctx, t, true)
 	if !e.beginTaskOperation(t.ID) {
 		return false
@@ -254,15 +254,15 @@ func (e *Engine) runFinalPlannerRound(ctx context.Context, t *Task) (met bool) {
 	defer e.decInflight(t.ID)
 	emit := func(r db.Activity) { e.emitActivity(t, r) }
 	e.emitActivity(t, db.Activity{Worker: "planner", Kind: "round",
-		Summary: fmt.Sprintf("任务超时收尾·终局判定(第 %d 轮)", e.nextPlannerRound(t.ID))})
+		Summary: fmt.Sprintf("태스크 타임아웃 종료·최종 판정(%d 라운드)", e.nextPlannerRound(t.ID))})
 	tTaskID, _ := strconv.ParseInt(t.ID, 10, 64)
 	e.BeginLLMCall(t.ID)
 	met, reason, err := planner.Plan(fctx, tTaskID, e.m.assets, t.Store, t.Goal, t.drainTriggers(), emit)
 	e.EndLLMCall(t.ID)
 	if err != nil {
-		log.Printf("[deadline] task %s 终局规划出错: %v", t.ID, err)
+		log.Printf("[deadline] task %s 최종 계획이 잘못됐어요: %v", t.ID, err)
 	} else if met {
-		log.Printf("[deadline] task %s 终局判定目标达成: %s", t.ID, reason)
+		log.Printf("[deadline] task %s 최종 판정 목표 달성: %s", t.ID, reason)
 	}
 	return met
 }

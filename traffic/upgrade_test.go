@@ -41,7 +41,7 @@ func TestUpgradeFromOldInstall(t *testing.T) {
 	if _, err := old.Exec(ftsSchema); err != nil {
 		t.Fatal(err)
 	}
-	// 三条历史流量，含一条 legacy path<>'' 的行
+	// 1개를 포함한 3개의 과거 트래픽 흐름 legacy path<>'' 행
 	for i, row := range [][]any{
 		{"1700000000-0001", "old.example.com", ""},
 		{"1700000000-0002", "old.example.com", ""},
@@ -52,10 +52,10 @@ VALUES(?,?,?,'GET','/x','http://x/x',200,'text/html',0,9,?)`, row[0], 1700000000
 			t.Fatal(err)
 		}
 		if _, err := old.Exec(`INSERT INTO exchange_bodies(id,req_head,req_body,resp_head,resp_body)
-VALUES(?,'GET /x','','HTTP 200','老数据正文')`, row[0]); err != nil {
+VALUES(?,'GET /x','','HTTP 200','이전 데이터 텍스트')`, row[0]); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := old.Exec(`INSERT INTO ex_fts(rowid,content) VALUES(?,?)`, i+1, "老数据正文 secret-token"); err != nil {
+		if _, err := old.Exec(`INSERT INTO ex_fts(rowid,content) VALUES(?,?)`, i+1, "이전 데이터 텍스트 secret-token"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -67,66 +67,66 @@ VALUES(?,'GET /x','','HTTP 200','老数据正文')`, row[0]); err != nil {
 		t.Fatal(err)
 	}
 
-	// ---- 新版本接管
+	// ---- 새 버전이 인계됩니다.
 	tr, err := Open(dir, "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("新版本无法打开旧库: %v", err)
+		t.Fatalf("새 버전에서는 이전 라이브러리를 열 수 없습니다: %v", err)
 	}
 	defer tr.Close()
 
-	// 1. 必须是同一个文件，不能悄悄开了个新空库
+	// 1. 동일한 파일이어야 하며, 빈 라이브러리를 새로 열 수는 없습니다.
 	if st2, err := os.Stat(path); err != nil || st2.Size() == 0 {
-		t.Fatalf("原索引文件异常: size=%v err=%v", st2, err)
+		t.Fatalf("원본 인덱스 파일이 비정상입니다: size=%v err=%v", st2, err)
 	}
 	if entries, _ := os.ReadDir(filepath.Join(dir, "_index")); len(entries) > 3 {
 		for _, e := range entries {
-			t.Logf("_index 下: %s", e.Name())
+			t.Logf("_아래 색인: %s", e.Name())
 		}
-		t.Fatal("_index 下出现了预期外的文件，DSN 可能指向了别的库")
+		t.Fatal("_index 아래에 예상치 못한 파일이 나타납니다. DSN는 다른 라이브러리를 가리킬 수 있습니다.")
 	}
-	t.Logf("旧库 %d 字节，新版本接管后仍是同一文件", stat.Size())
+	t.Logf("이전 라이브러리는 %d 바이트입니다. 새 버전이 적용된 후에도 여전히 동일한 파일입니다.", stat.Size())
 
-	// 2. 历史数据全部可见
+	// 2. 모든 과거 데이터가 표시됩니다.
 	n, err := tr.Count()
 	if err != nil || n != 3 {
-		t.Fatalf("Count=(%d,%v)，应为 (3,nil) —— 历史流量丢失", n, err)
+		t.Fatalf("Count=(%d,%v)는 (3,nil)여야 합니다. - 기록 트래픽이 손실됩니다.", n, err)
 	}
-	// 3. 历史全文索引仍可搜
+	// 3. 기록 전체 텍스트 색인은 계속 검색 가능합니다.
 	if tr.fts {
 		rows, err := tr.query("old.example.com", "", "secret-token", 0, 10)
 		if err != nil {
-			t.Fatalf("历史全文搜索失败: %v", err)
+			t.Fatalf("기록 전체 텍스트 검색 실패: %v", err)
 		}
 		if len(rows) != 2 {
-			t.Fatalf("历史全文搜索命中 %d 条，应为 2", len(rows))
+			t.Fatalf("기록 전체 텍스트 검색은 2가 되어야 하는 %d를 적중합니다.", len(rows))
 		}
 	}
-	// 4. 历史正文仍可读
+	// 4. 역사적 텍스트는 여전히 읽을 수 있습니다
 	if _, resp, err := tr.Get("1700000000-0001"); err != nil {
-		t.Fatalf("读取历史正文失败: %v", err)
+		t.Fatalf("기록 텍스트를 읽지 못했습니다: %v", err)
 	} else if resp == "" {
-		t.Fatal("历史响应为空")
+		t.Fatal("기록 응답이 비어 있습니다.")
 	}
-	// 5. 旧库不会被误判为已启用增量回收
+	// 5. 이전 라이브러리는 증분 재활용이 활성화된 것으로 잘못 판단되지 않습니다.
 	if tr.incrementalVacuum {
-		t.Fatal("旧库被误判为已启用增量回收")
+		t.Fatal("기존 라이브러리가 증분 재활용이 활성화된 것으로 잘못 판단되었습니다.")
 	}
-	// 6. 删除仍然正常工作，且回收流程在旧库上能收敛
+	// 6. 삭제는 여전히 정상적으로 작동하며 재활용 프로세스는 이전 데이터베이스에 수렴될 수 있습니다.
 	deleted, err := tr.DeleteHostsExact([]string{"old.example.com"})
 	if err != nil || deleted != 2 {
-		t.Fatalf("DeleteHostsExact=(%d,%v)，应为 (2,nil)", deleted, err)
+		t.Fatalf("DeleteHostsExact=(%d,%v)는 (2,nil)이어야 합니다.", deleted, err)
 	}
 	tr.reaping.Wait()
 	if n, err := tr.Count(); err != nil || n != 1 {
-		t.Fatalf("删除后 Count=(%d,%v)，应为 (1,nil)", n, err)
+		t.Fatalf("Count=(%d,%v)를 삭제하면 (1,nil)가 되어야 합니다.", n, err)
 	}
-	// 7. legacy path<>'' 的行没被牵连
+	// 7. legacy path<>'' 라인은 연루되지 않았습니다
 	var legacyPath string
 	if err := tr.DB().QueryRow(`SELECT path FROM exchanges`).Scan(&legacyPath); err != nil {
 		t.Fatal(err)
 	}
 	if legacyPath == "" {
-		t.Fatal("legacy 行的 path 被清空了")
+		t.Fatal("legacy 행의 path가 지워졌습니다.")
 	}
 }
 
@@ -141,24 +141,24 @@ func TestDowngradeToOldBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !tr.incrementalVacuum {
-		t.Fatal("新库应启用增量回收")
+		t.Fatal("새로운 라이브러리는 점진적인 재활용을 가능하게 해야 합니다.")
 	}
 	bulkRecord(tr, "keep.example.com", 5, 100*1024)
 	if err := tr.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	old := openLegacyIndex(t, dir) // 旧版本二进制接管
+	old := openLegacyIndex(t, dir) // 이전 버전 바이너리가 대신합니다.
 	defer old.Close()
 	var n int
 	if err := old.QueryRow(`SELECT COUNT(*) FROM exchanges`).Scan(&n); err != nil || n != 5 {
-		t.Fatalf("旧版本读到 (%d,%v)，应为 (5,nil)", n, err)
+		t.Fatalf("이전 버전에서는 (%d,%v)로 읽는데, 이는 (5,nil)여야 합니다.", n, err)
 	}
 	if _, err := old.Exec(`INSERT INTO exchanges(id,ts,host,method,url_template,url,status,content_type,req_len,resp_len,path)
 VALUES('x',1,'new.example.com','GET','/x','http://x/x',200,'',0,0,'')`); err != nil {
-		t.Fatalf("旧版本写入失败: %v", err)
+		t.Fatalf("이전 버전을 쓰지 못했습니다: %v", err)
 	}
 	if _, err := old.Exec(`DELETE FROM exchanges WHERE host='keep.example.com'`); err != nil {
-		t.Fatalf("旧版本删除失败: %v", err)
+		t.Fatalf("이전 버전 삭제 실패: %v", err)
 	}
 }

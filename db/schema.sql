@@ -1,17 +1,17 @@
--- ARTEX PostgreSQL schema (单一数据源)
--- 幂等：可重复执行（IF NOT EXISTS / OR REPLACE / DROP TRIGGER IF EXISTS）。
+-- ARTEX PostgreSQL schema(단일 데이터 소스)
+-- 멱등성: 반복 가능한 실행(IF NOT EXISTS / OR REPLACE / DROP TRIGGER IF EXISTS).
 
 -- =====================================================================
--- 0. 通用：updated_at 触发器
+-- 0. 범용: updated_at 트리거
 -- =====================================================================
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END;
 $$ LANGUAGE plpgsql;
 
--- 安全的 text→inet 转换：非法值返回 NULL 而不是抛 22P02。assets.ip 是自由文本
--- (Agent / 资产 API 可能写进主机名)，裸转 a.ip::inet 会让单独一行脏数据把整条
--- 企业归属重算语句打挂。调用方用 try_inet(...) IS NULL 找出这些行并告警。
--- 不用 pg_input_is_valid 是因为那要 PG16+，这里要兼容更老的存量库。
+-- 안전한 text→inet 변환: 잘못된 값은 22P02를 던지는 대신 NULL를 반환합니다. assets.ip는 자유 텍스트입니다.
+-- (Agent / 자산 API가 호스트 이름에 기록될 수 있음) a.ip::inet로의 네이키드 전송으로 인해 더티 데이터의 단일 행이 전체를 대체하게 됩니다.
+-- 기업 소유권 재계산 문이 차단되었습니다. 발신자는 try_inet(...) IS NULL를 사용하여 이러한 회선을 찾아 경고합니다.
+-- pg_input_is_valid는 이전 스톡 라이브러리와 호환되어야 하는 PG16+가 필요하기 때문에 사용되지 않습니다.
 CREATE OR REPLACE FUNCTION try_inet(value text) RETURNS inet AS $$
 BEGIN
     RETURN value::inet;
@@ -21,7 +21,7 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
 -- =====================================================================
--- A. 资产层：companies / assets / company_scope
+-- A. 자산 레이어: companies / assets / company_scope
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS companies (
@@ -148,7 +148,7 @@ CREATE INDEX IF NOT EXISTS idx_sv2_icp ON company_scope(value) WHERE kind = 'icp
 CREATE INDEX IF NOT EXISTS idx_sv2_company ON company_scope(company_id);
 
 -- =====================================================================
--- B. 推理探索层
+-- B. 추론 및 탐색 계층
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS explorations (
     id          BIGSERIAL PRIMARY KEY,
@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS exploration_nodes (
     )
 );
 ALTER TABLE exploration_nodes ADD COLUMN IF NOT EXISTS blocked_reason TEXT;
--- 意图假删除(soft delete):state='deleted' 时,delete_reason 记用户填写的删除原因。
+-- 잘못된 삭제를 의도한 경우(soft delete): state='deleted', delete_reason는 사용자가 입력한 삭제 이유를 기록합니다.
 ALTER TABLE exploration_nodes ADD COLUMN IF NOT EXISTS delete_reason TEXT;
 -- cold-digest (§2.3/§5.3): content_version bumps on any change that could alter a
 -- digest body (summary/state/confidence); cold_since_round stamps the planner round
@@ -282,7 +282,7 @@ CREATE INDEX IF NOT EXISTS idx_anchor_asset ON exploration_anchors(asset_id);
 
 -- task_constraints: operator-authored operation constraints (allow/deny) for a task.
 -- Extracted by the goals decomposer at round 0 (from goal/description), editable at
--- runtime by the main agent + 总览「约束管理」. Injected into the planner/worker system
+-- runtime by the main agent + 개요 "제약조건 관리". Injected into the planner/worker system
 -- prompt each round (config-gated) to keep exploration within the operator's boundary.
 CREATE TABLE IF NOT EXISTS task_constraints (
     id             BIGSERIAL PRIMARY KEY,
@@ -340,7 +340,7 @@ CREATE INDEX IF NOT EXISTS idx_act_latest ON activity(exploration_id, created_at
 
 -- main_sessions records the resettable main-agent conversation segments of a task.
 -- Segment 0 (the original session) is implicit and never stored; this table holds
--- only the extra segments created by "新建会话" (seq >= 1). The current segment is
+-- only the extra segments created by "새 세션"(seq >= 1). The current segment is
 -- MAX(seq) or 0. Each segment gets its own transcript file + activity slice; the
 -- task's exploration graph/assets/goal are shared and never reset.
 CREATE TABLE IF NOT EXISTS main_sessions (
@@ -371,32 +371,32 @@ CREATE TABLE IF NOT EXISTS llm_profiles (
     rate_per_second  DOUBLE PRECISION NOT NULL DEFAULT 0,
     rate_per_minute  DOUBLE PRECISION NOT NULL DEFAULT 0,
     context_window_k INTEGER NOT NULL DEFAULT 0,
-    -- 思考参数拆成两个独立字段：thinking_type=思考开关(''/disabled/enabled)，
-    -- reasoning_effort=思考强度(''/low/medium/high/xhigh/max)，互不牵连。
+    -- 사고 매개변수는 두 개의 독립적인 필드로 분할됩니다: thinking_type=사고 스위치(''/disabled/enabled),
+    -- reasoning_effort=사고 강도(''/low/medium/high/xhigh/max), 서로 관련이 없습니다.
     reasoning_effort TEXT NOT NULL DEFAULT '',
     thinking_type    TEXT NOT NULL DEFAULT '',
     is_default       BOOLEAN NOT NULL DEFAULT false,
-    -- 轮询(故障转移)参数，见 docs/LLM轮询设计.md：
-    --   priority     顺位，越大越先被选中；激活配置(is_default)永远排链首，与本值无关。
-    --   pool_exclude true=不作为故障转移目标(仍可被 agent/任务显式绑定使用)。
+    -- 폴링(장애 조치) 매개변수에 대해서는 docs/LLM 폴링 설계를 참조하세요.md:
+    --   priority 주문은 크기가 클수록 먼저 선택됩니다. 활성화된 구성(is_default)은 이 값에 관계없이 항상 체인에서 첫 번째 순위가 지정됩니다.
+    --   pool_exclude true=장애 조치 대상으로 사용되지 않습니다(여전히 agent/ 작업에 명시적으로 바인딩될 수 있음).
     priority         INTEGER NOT NULL DEFAULT 0,
     pool_exclude     BOOLEAN NOT NULL DEFAULT false,
-    -- streaming=true(默认)走流式 SSE；false 走真·非流式(stream:false，一次性 JSON)。
+    -- streaming=true(기본값) 흐름 유형 SSE; false 진정한 비유동형(stream:false, 일회용 JSON).
     streaming        BOOLEAN NOT NULL DEFAULT true,
-    -- 单次回复的输出上限(token)。0=不发送该字段，由服务端默认值决定——保持既有行为。
-    -- 与 context_window_k(模型总容量，仅本地用于压缩阈值)是两回事：本值会随请求发出。
+    -- 단일 응답의 출력 상한(token)입니다. 0 = 서버 기본값에 따라 이 필드를 보내지 않고 기존 동작을 유지합니다.
+    -- context_window_k(총 모델 용량, 압축 임계값에 로컬로만 사용됨)와 다릅니다. 이 값은 요청과 함께 전송됩니다.
     max_tokens       INTEGER NOT NULL DEFAULT 0,
-    -- 输出上限用哪个请求字段名，仅对 format='openai' 生效：
-    --   ''                      = max_tokens(默认，兼容绝大多数网关)
-    --   'max_completion_tokens' = 新字段；OpenAI 推理模型(o 系列/GPT-5)只认它，
-    --                             发 max_tokens 会被 unsupported_parameter 拒绝。
-    -- anthropic(max_tokens 必填)与 openai-responses(max_output_tokens)自带字段名，不受此值影响。
+    -- 상한값을 출력하는 데 사용되는 요청 필드 이름은 무엇입니까? format='openai'에만 적용됩니다.
+    --   '' = max_tokens(기본값, 대부분의 게이트웨이와 호환 가능)
+    --   'max_completion_tokens' = 새 필드; OpenAI 추론 모델(o 시리즈/GPT-5)만 인식하고,
+    --                             max_tokens 전송은 unsupported_parameter에 의해 거부됩니다.
+    -- anthropic(max_tokens 필수) 및 openai-responses(max_output_tokens)에는 고유한 필드 이름이 있으며 이 값의 영향을 받지 않습니다.
     max_tokens_field TEXT NOT NULL DEFAULT '',
-    -- 自定义会话头：非空时每次请求带一个该名字的 HTTP 头，头值=当前运行的 session id
-    -- (chat 会话/worker 意图)。用于某些按 session-id 头做提示缓存/粘性路由的网关。''=不发送。
+    -- 사용자 정의 세션 헤더: 비어 있지 않은 경우 각 요청은 이 이름의 HTTP 헤더를 전달하며 헤더 값 = 현재 실행 중인 session id
+    -- (chat 세션/worker 인텐트). session-id 헤더를 기반으로 캐싱/고정 라우팅을 요청하는 일부 게이트웨이에 사용됩니다. ''=보내지 마세요.
     session_header_key TEXT NOT NULL DEFAULT '',
-    -- 重试覆盖：次数 0=用全局默认/-1=关闭/>0=该值；间隔 0=用默认指数退避/>0=固定毫秒。
-    -- 三组分别对应建连重试、空响应重试、同 provider 安全窗口重试，详见下方 ALTER 处注释。
+    -- 재시도 범위: 번 0=전역 기본값 사용/-1=해제/>0=이 값; 간격 0=기본 지수 백오프 사용/>0=고정 밀리초.
+    -- 세 그룹은 각각 연결 설정 재시도, 빈 응답 재시도 및 provider 보안 창 재시도에 해당합니다. 자세한 내용은 아래 ALTER의 참고 사항을 참조하세요.
     retry_connect_attempts    INTEGER NOT NULL DEFAULT 0,
     retry_connect_interval_ms INTEGER NOT NULL DEFAULT 0,
     retry_empty_attempts      INTEGER NOT NULL DEFAULT 0,
@@ -410,55 +410,55 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_one_default ON llm_profiles(is_default)
 DROP TRIGGER IF EXISTS trg_llm_upd ON llm_profiles;
 CREATE TRIGGER trg_llm_upd BEFORE UPDATE ON llm_profiles
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
--- 轮询顺位/排除标记；补旧库。默认 0 / false = 全部配置都参与轮询。
+-- 폴링 순서/제외 플래그; 오래된 도서관을 보충합니다. 기본값 0 / false = 모든 구성이 폴링에 참여합니다.
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS priority     INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS pool_exclude BOOLEAN NOT NULL DEFAULT false;
--- 流式开关；补旧库。默认 true = 保持既有的流式行为，旧配置无感升级。
+-- 스트리밍 스위치; 오래된 도서관을 보충하세요. 기본 true = 기존 스트리밍 동작을 유지하고 아무런 의미 없이 이전 구성을 업그레이드합니다.
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS streaming    BOOLEAN NOT NULL DEFAULT true;
--- 放开 format 约束以容纳 openai-responses(OpenAI Responses API)；补旧库。
--- 每次启动执行,幂等:先删旧 CHECK 再建含三值的新 CHECK。
+-- 열려 있는 format 수용할 수 없도록 제약됨 openai-responses(OpenAI Responses API)；오래된 도서관을 보충하세요。
+-- 시작되고 실행될 때마다 멱등성이 있습니다. 먼저 이전 CHECK를 삭제한 다음 세 개의 값을 포함하는 새 CHECK를 만듭니다.
 ALTER TABLE llm_profiles DROP CONSTRAINT IF EXISTS llm_profiles_format_check;
 ALTER TABLE llm_profiles ADD  CONSTRAINT llm_profiles_format_check
     CHECK (format IN ('openai','anthropic','openai-responses'));
 
--- 输出上限及其字段名；补旧库。默认 0 / '' = 不发送上限、沿用 max_tokens 字段名，
--- 旧配置行为完全不变。
+-- 상한값과 해당 필드 이름을 출력합니다. 오래된 도서관을 채워보세요. 기본값 0 / '' = 상한을 보내지 않고 max_tokens 필드 이름을 사용합니다.
+-- 이전 구성의 동작은 완전히 변경되지 않았습니다.
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS max_tokens       INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS max_tokens_field TEXT    NOT NULL DEFAULT '';
--- 同 format：先删再建，保证每次启动幂等。
+-- format와 동일: 먼저 삭제한 다음 생성하여 시작할 때마다 멱등성을 보장합니다.
 ALTER TABLE llm_profiles DROP CONSTRAINT IF EXISTS llm_profiles_max_tokens_field_check;
 ALTER TABLE llm_profiles ADD  CONSTRAINT llm_profiles_max_tokens_field_check
     CHECK (max_tokens_field IN ('','max_completion_tokens'));
 ALTER TABLE llm_profiles DROP CONSTRAINT IF EXISTS llm_profiles_max_tokens_check;
 ALTER TABLE llm_profiles ADD  CONSTRAINT llm_profiles_max_tokens_check
     CHECK (max_tokens >= 0);
--- 自定义会话头名；补旧库。默认 '' = 不发送，旧配置行为不变。
+-- 세션 헤더 이름을 사용자 정의하십시오. 오래된 도서관을 채워보세요. 기본값 '' = 보내지 않음, 이전 구성 동작은 변경되지 않습니다.
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS session_header_key TEXT NOT NULL DEFAULT '';
 
--- 单配置的重试覆盖（见 docs/LLM重试设计.md）。三组各自一对「次数 + 固定间隔」，
--- 语义统一：次数 0=沿用全局默认、-1=关闭该层重试、>0=用该值；间隔 0=沿用该层的
--- 默认指数退避、>0=改用这个固定毫秒数。全部默认 0，所以旧库/旧配置行为不变。
---   connect = 建连重试（SDK doStream：连接重置/超时/429/5xx，流开始前）
---   empty   = 空响应重试（SDK：完成但没有任何 content block，仅 openai 格式）
---   stream  = 同 provider 安全窗口重试（本项目 task_llm：未交付输出前的断流重放）
+-- 단일 구성 재시도 범위(docs/LLM 재시도 설계.md 참조) 세 그룹은 각각 '반복수 + 고정 간격'이 한 쌍으로 구성되어 있으며,
+-- 통합 의미: 시간 0=전역 기본값 상속, -1=레이어를 닫고 다시 시도, >0=이 값 사용; 간격 0=레이어 상속
+-- 기본 지수 백오프, >0=대신 이 고정된 수의 밀리초를 사용합니다. 모두 기본값은 0이므로 이전 라이브러리/이전 구성 동작은 변경되지 않습니다.
+--   connect = 연결 설정 재시도(SDK doStream: 스트리밍 시작 전 연결 재설정/시간 초과/429/5xx)
+--   empty = 빈 응답으로 재시도(SDK: content block 없이 완료, openai 형식만)
+--   stream = provider 안전 창 재시도와 동일(이 프로젝트 task_llm: 출력이 전달되기 전 중단 재생)
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS retry_connect_attempts    INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS retry_connect_interval_ms INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS retry_empty_attempts      INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS retry_empty_interval_ms   INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS retry_stream_attempts     INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_profiles ADD COLUMN IF NOT EXISTS retry_stream_interval_ms  INTEGER NOT NULL DEFAULT 0;
--- 同 format：先删再建，保证每次启动幂等。次数下限 -1(关闭)，间隔不能为负。
+-- format와 동일: 먼저 삭제한 다음 생성하여 시작할 때마다 멱등성을 보장합니다. 횟수의 하한은 -1(해제)이고 간격은 음수가 될 수 없습니다.
 ALTER TABLE llm_profiles DROP CONSTRAINT IF EXISTS llm_profiles_retry_check;
 ALTER TABLE llm_profiles ADD  CONSTRAINT llm_profiles_retry_check CHECK (
     retry_connect_attempts >= -1 AND retry_empty_attempts >= -1 AND retry_stream_attempts >= -1
     AND retry_connect_interval_ms >= 0 AND retry_empty_interval_ms >= 0 AND retry_stream_interval_ms >= 0);
 
--- 思考开关字段 thinking_type，从旧的单一 reasoning_effort 语义一次性拆分而来。
--- schema.sql 每次启动都执行，故迁移必须只跑一次：仅当该列尚不存在时才回填，
--- 否则每次启动都会把用户后来手动设的组合覆盖回去。旧 reasoning_effort 语义：
---   'off'                    → 显式关闭  → thinking_type='disabled'，强度清空
---   'low/medium/high/max'    → 开启+强度 → thinking_type='enabled'，强度保留
---   ''                       → 不发送    → 两者皆空(默认)
+-- 이전 단일 reasoning_effort 의미 체계에서 한 번에 분할된 스위치 필드 thinking_type를 생각해 보세요.
+-- schema.sql는 시작될 때마다 실행되므로 마이그레이션은 한 번만 실행해야 합니다. 열이 아직 존재하지 않는 경우에만 백필됩니다.
+-- 그렇지 않으면 시작할 때마다 사용자가 수동으로 설정한 조합을 덮어쓰게 됩니다. 이전 reasoning_effort 의미:
+--   'off' → 명시적으로 닫음 → thinking_type='disabled', 강도 지우기
+--   'low/medium/high/max' → 켜기 + 강도 → thinking_type='enabled', 강도가 유지됩니다.
+--   '' → 보내지 않음 → 둘 다 비어 있음(기본값)
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -473,20 +473,20 @@ BEGIN
     END IF;
 END $$;
 
--- LLM 轮询熔断状态：某个配置连续失败(余额不足/key 失效/限流)后进入冷却，冷却期内
--- 轮询直接跳过它。内存态为准，这里落库只为重启后不丢冷却窗口——加载时只取尚未
--- 到期的行(open_until > now)，已到期的自然回到"正常"，等下一次调用半开试探。
+-- LLM 폴링 퓨즈 상태: 특정 구성이 지속적으로 실패하면(밸런스 부족/key 실패/전류 제한) 냉각 기간에 들어갑니다. 냉각 기간 동안
+-- 폴링은 단순히 건너뜁니다. 메모리 상태가 우선합니다. 여기에 라이브러리를 삭제하는 목적은 다시 시작한 후 냉각 창을 잃지 않는 것입니다. 로드할 때 사용되지 않은 데이터만 검색됩니다.
+-- 만료된 행(open_until > now)은 자연스럽게 "정상"으로 돌아가고 다음 반개방 테스트가 호출될 때까지 기다립니다.
 CREATE TABLE IF NOT EXISTS llm_profile_health (
     profile_id  BIGINT PRIMARY KEY REFERENCES llm_profiles(id) ON DELETE CASCADE,
-    fails       INTEGER NOT NULL DEFAULT 0,  -- 当前连续失败次数(成功即清零)
-    trips       INTEGER NOT NULL DEFAULT 0,  -- 累计熔断次数,用于冷却时间指数退避
-    open_until  TIMESTAMPTZ,                 -- 冷却截止;NULL/过期 = 未熔断
+    fails       INTEGER NOT NULL DEFAULT 0,  -- 현재 연속 실패 횟수(성공 시 삭제됨)
+    trips       INTEGER NOT NULL DEFAULT 0,  -- 퓨즈 누적 개수,휴지 지수 백오프에 사용됩니다.
+    open_until  TIMESTAMPTZ,                 -- 냉각 차단;NULL/만료됨 = 날아가지 않음
     last_error  TEXT NOT NULL DEFAULT '',
     last_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- =====================================================================
--- D. 任务层
+-- D. 태스크 레이어
 -- =====================================================================
 -- Global task categories are intentionally independent from task templates.
 -- Deleting a category only moves its tasks back to the uncategorized bucket.
@@ -538,20 +538,20 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)          WHERE dele
 DROP TRIGGER IF EXISTS trg_tasks_upd ON tasks;
 CREATE TRIGGER trg_tasks_upd BEFORE UPDATE ON tasks
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
--- planner 心跳触发间隔(秒);补旧库。默认 300s(5min)。见 docs/planner-trigger-impl-plan.md
+-- planner 하트비트 트리거 간격(초); 기존 데이터베이스를 보완합니다. 기본 300초(5분). docs/planner-trigger-impl-plan.md 참조
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS plan_heartbeat_seconds INTEGER NOT NULL DEFAULT 300;
--- 并发上限挂起态;补旧库。true=因并发上限排队、等待空位自动启动。
+-- 동시성 제한이 일시 중지되었습니다. 오래된 도서관이 보완되었습니다. true=동시성 상한으로 인해 대기 중이며 공간이 자동으로 시작될 때까지 기다리고 있습니다.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS queued BOOLEAN NOT NULL DEFAULT false;
--- 资产覆盖度功能开关;补旧库。true(默认)=计算/展示测试覆盖度、自动累积测试范围、
--- 给 agent 开放 add_task_scope/list_untested_assets;false=全部关闭(见 task_scope.go)。
--- 存量任务默认 true 保持原行为;company 关联(task_scope kind=company)不受此开关影响。
+-- 자산 커버리지 기능 스위치; 오래된 도서관을 보충하세요. true(기본값)=테스트 범위 계산/표시, 자동 누적 테스트 범위,
+-- agent에 대해 add_task_scope/list_untested_assets를 엽니다. false=모두 닫기(task_scope.go 참조).
+-- 기본적으로 기존 작업 true는 원래 동작을 유지합니다. company 연결(task_scope kind=company)은 이 스위치의 영향을 받지 않습니다.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS coverage_enabled BOOLEAN NOT NULL DEFAULT true;
 -- queued_at makes admission FIFO reflect the actual enqueue order rather than the
 -- task creation order. queue_mode distinguishes first bootstrap from resuming an
 -- exploration that already owns goals/history.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS queued_at TIMESTAMPTZ;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS queue_mode TEXT NOT NULL DEFAULT '';
--- 可选的任务名称;补旧库。空串=未命名,前端展示时回退到描述。
+-- 선택적 작업 이름. 오래된 라이브러리를 패치하세요. 빈 문자열 = 이름이 없으며 프런트 엔드에 표시될 때 설명으로 대체됩니다.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES task_categories(id) ON DELETE SET NULL;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ;
@@ -616,14 +616,14 @@ CREATE TABLE IF NOT EXISTS task_templates (
     nkey        TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
     goal        TEXT NOT NULL,
-    -- 预设的任务分类；分类删除时置空（与 tasks.category_id 一致，不阻断）。
+    -- 기본 작업 카테고리. 카테고리 삭제시 공란으로 남겨두세요.(항목 삭제시와 동일) tasks.category_id 일관성, 차단하지 않음）。
     category_id     BIGINT REFERENCES task_categories(id) ON DELETE SET NULL,
-    -- 预设的任务级拦截/允许规则快照(AssetInterceptRuleInput 数组)；应用模板时灌进新任务。
+    -- 기본 작업 수준 차단/허용 규칙의 스냅샷(AssetInterceptRuleInput 어레이) 템플릿이 적용될 때 새로운 작업을 주입합니다.
     intercept_rules JSONB NOT NULL DEFAULT '[]',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- 补旧库(已发版,加列带 IF NOT EXISTS)。
+-- 이전 라이브러리를 보완합니다(출시된 버전, IF NOT EXISTS 추가).
 ALTER TABLE task_templates ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES task_categories(id) ON DELETE SET NULL;
 ALTER TABLE task_templates ADD COLUMN IF NOT EXISTS intercept_rules JSONB NOT NULL DEFAULT '[]';
 CREATE INDEX IF NOT EXISTS idx_task_templates_updated ON task_templates(updated_at DESC, id DESC);
@@ -667,7 +667,7 @@ CREATE TRIGGER trg_task_asset_links_upd BEFORE UPDATE ON task_asset_links
 CREATE OR REPLACE FUNCTION sync_task_asset_links() RETURNS trigger AS $$
 BEGIN
     INSERT INTO task_asset_links(task_id, asset_id, source, source_summary)
-    SELECT task.id, NEW.id, 'system', '任务执行期间自动关联'
+    SELECT task.id, NEW.id, 'system', '작업 실행 중 자동 연결'
     FROM unnest(NEW.task_ids) AS requested(task_id)
     JOIN tasks task ON task.id=requested.task_id AND task.deleted_at IS NULL
     ON CONFLICT (task_id, asset_id) DO NOTHING;
@@ -685,7 +685,7 @@ CREATE TRIGGER trg_assets_task_links AFTER INSERT OR UPDATE OF task_ids ON asset
 -- Existing installations receive an auditable legacy source without rewriting
 -- task_ids. Ignore stale array ids that no longer resolve to a live task.
 INSERT INTO task_asset_links(task_id, asset_id, source, source_summary)
-SELECT task.id, asset.id, 'legacy', '由历史任务资产关联迁移'
+SELECT task.id, asset.id, 'legacy', '과거과제 자산 연계별 이전'
 FROM assets asset
 CROSS JOIN LATERAL unnest(asset.task_ids) AS requested(task_id)
 JOIN tasks task ON task.id=requested.task_id AND task.deleted_at IS NULL
@@ -729,12 +729,12 @@ WHERE t.active_llm_profile_id IS NULL
   AND t.llm_profile_id IS NOT NULL
   AND EXISTS (SELECT 1 FROM task_llm_profiles x WHERE x.task_id=t.id AND x.profile_id=t.llm_profile_id);
 
--- 任务测试范围（资产覆盖度的分母 + 授权边界）。
---   自动填(source='auto')：insertAssets 顶层按 worker 显式插入的资产类型加保守范围
+-- 작업 테스트 범위(자산 범위의 분모 + 권한 범위).
+--   자동 채우기(source='auto'): insertAssets 최상위 수준은 worker에 의해 명시적으로 삽입된 자산 유형에 보수적 범위를 더한 것입니다.
 --     （root_domain→root_domain，subdomain/service/endpoint→subdomain(host)，ip→ip）；
---     side-effect 派生的资产不入范围（钩子在 handler 顶层，派生在 db 层内部）。
---   agent 填(source='agent')：add_task_scope 加 company/root_domain/subdomain/ip。
--- 覆盖度 = 匹配 active 行的 assets（分母）中，被 fact 节点锚定过的占比（分子）。
+--     side-effect에서 파생된 자산은 범위를 벗어났습니다. 후크는 handler의 최상위 수준에 있고 db 레이어 내부에서 파생되었습니다.
+--   agent 채우다(source='agent')：add_task_scope 추가하다 company/root_domain/subdomain/ip。
+-- 적용 범위 = fact 노드에 의해 고정된 active 행과 일치하는 assets(분모)의 비율(분자)입니다.
 CREATE TABLE IF NOT EXISTS task_scope (
     id          BIGSERIAL PRIMARY KEY,
     task_id     BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -747,12 +747,12 @@ CREATE TABLE IF NOT EXISTS task_scope (
     reason      TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- 旧库升级：扩展任务范围，使其与企业范围的单文本框识别能力一致。
+-- 레거시 라이브러리 업그레이드: 전사적 단일 텍스트 상자 인식 기능에 맞춰 작업 범위를 확장했습니다.
 ALTER TABLE task_scope ADD COLUMN IF NOT EXISTS value TEXT;
 ALTER TABLE task_scope DROP CONSTRAINT IF EXISTS task_scope_kind_check;
 ALTER TABLE task_scope ADD CONSTRAINT task_scope_kind_check
     CHECK (kind IN ('company','root_domain','subdomain','ip','cidr','icp','keyword'));
--- 去重：同一 task 的同一条范围只存一次（自动填批量插入靠它幂等）。
+-- 중복 제거: task의 동일한 범위는 한 번만 저장됩니다(자동 배치 삽입은 멱등성에 의존함).
 DROP INDEX IF EXISTS uq_task_scope;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_task_scope_v2 ON task_scope(
     task_id, kind, COALESCE(domain,''), COALESCE(net::text,''), COALESCE(company_id,0), COALESCE(value,''));
@@ -761,7 +761,7 @@ CREATE INDEX IF NOT EXISTS idx_ts_net     ON task_scope USING GIST(net inet_ops)
 CREATE INDEX IF NOT EXISTS idx_ts_company ON task_scope(company_id) WHERE kind = 'company';
 
 -- =====================================================================
--- E. Agents / 提示词模板 / 变量目录
+-- E. Agents / 프롬프트 단어 템플릿 / 변수 디렉토리
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS agents (
     id                BIGSERIAL PRIMARY KEY,
@@ -788,13 +788,13 @@ CREATE TABLE IF NOT EXISTS agents (
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT agents_role_ck CHECK (role IN ('goals','main','planner','worker','assistant'))
 );
--- 加列迁移(已发版,旧库升级补列;新库 CREATE 已含。迁移不带 CHECK:旧库存量安全 + 后端写入白名单兜底)。
+-- 열 마이그레이션이 추가되었습니다(출시된 버전, 이전 데이터베이스 업그레이드 및 보충 열, 새 데이터베이스 CREATE가 포함됩니다. 마이그레이션에는 CHECK: 이전 인벤토리 보안 + 보호를 위한 백엔드 쓰기 화이트리스트가 포함되지 않습니다).
 ALTER TABLE agents ADD COLUMN IF NOT EXISTS trigger_run_mode     TEXT    NOT NULL DEFAULT 'serial';
 ALTER TABLE agents ADD COLUMN IF NOT EXISTS trigger_merge_mode   TEXT    NOT NULL DEFAULT 'all';
 ALTER TABLE agents ADD COLUMN IF NOT EXISTS trigger_max_parallel INTEGER NOT NULL DEFAULT 5;
--- per-agent LLM 绑定(agent 级默认模型):列自初版即在上方 CREATE 中,此 ALTER 仅为极旧库兜底(幂等)。
+-- per-agent LLM 바인딩(agent 레벨 기본 모델): 첫 번째 버전 이후 위의 CREATE에 나열되어 있으며, 이 ALTER는 매우 오래된 라이브러리에만 해당됩니다(멱등성).
 ALTER TABLE agents ADD COLUMN IF NOT EXISTS llm_profile_id BIGINT REFERENCES llm_profiles(id) ON DELETE SET NULL;
--- run_seconds 单次 run 墙钟默认 600→1200:只改列默认(影响将来新插入的行),不动旧库存量行。
+-- run_seconds 단일 run 벽시계 기본값 600 → 1200: 열 기본값만 변경되고(향후 새로 삽입되는 행에 영향을 줌) 이전 인벤토리 행은 이동되지 않습니다.
 ALTER TABLE agents ALTER COLUMN run_seconds SET DEFAULT 1200;
 CREATE INDEX IF NOT EXISTS idx_agents_llm_profile ON agents(llm_profile_id) WHERE llm_profile_id IS NOT NULL;
 DROP TRIGGER IF EXISTS trg_agents_upd ON agents;
@@ -811,7 +811,7 @@ CREATE TABLE IF NOT EXISTS agent_prompts (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (agent_id, version)
 );
--- 循环外键：agents.current_prompt_id → agent_prompts.id（需在两表创建后加）
+-- 순환 외래 키：agents.current_prompt_id → agent_prompts.id（두 개의 테이블이 생성된 후 추가해야 합니다.）
 DO $$ BEGIN
     ALTER TABLE agents ADD CONSTRAINT fk_agents_curprompt
         FOREIGN KEY (current_prompt_id) REFERENCES agent_prompts(id) ON DELETE SET NULL;
@@ -828,7 +828,7 @@ CREATE TABLE IF NOT EXISTS agent_prompt_vars (
 );
 
 -- =====================================================================
--- F. MCP 服务
+-- F. MCP 서비스
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS mcp_servers (
     id          BIGSERIAL PRIMARY KEY,
@@ -839,7 +839,7 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
     env         JSONB NOT NULL DEFAULT '{}',
     url         TEXT,
     enabled     BOOLEAN NOT NULL DEFAULT true,
-    insecure    BOOLEAN NOT NULL DEFAULT false,  -- http: 跳过 TLS 证书校验(自签证书场景, issue #108)
+    insecure    BOOLEAN NOT NULL DEFAULT false,  -- http: 뛰어넘다 TLS 인증서 확인(자체 서명된 인증서 시나리오, issue #108)
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -848,15 +848,15 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
 ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_transport_check;
 ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_transport_check
     CHECK (transport IN ('stdio','http','sse'));
--- 旧库补列(schema.sql 每次启动都会 Exec)。
+-- 이전 데이터베이스가 보완됩니다(schema.sql는 시작될 때마다 Exec가 됩니다).
 ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS insecure BOOLEAN NOT NULL DEFAULT false;
 DROP TRIGGER IF EXISTS trg_mcp_upd ON mcp_servers;
 CREATE TRIGGER trg_mcp_upd BEFORE UPDATE ON mcp_servers
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- 默认数据源占位：ScopeSentry 资产同步 MCP（地址与认证均留空、未启用）。
--- 供「资产同步」页检测数据源是否已配置；用户在页面填入 url 与 X-API-Key 后再启用。
--- 仅在缺失时插入，绝不覆盖用户已配置/已启用的服务器（schema.sql 每次启动都会 Exec）。
+-- 기본 데이터 소스 자리 표시자: ScopeSentry 자산 동기화 MCP(주소와 인증이 모두 비어 있고 활성화되지 않음)
+-- 데이터 소스가 구성되었는지 여부를 감지하기 위한 "자산 동기화" 페이지의 경우 사용자는 페이지에서 url 및 X-API-Key를 입력한 후 활성화할 수 있습니다.
+-- 누락된 경우에만 삽입하고 사용자가 구성한 내용을 덮어쓰지 않습니다./활성화된 서버（schema.sql 시작할 때마다 Exec）。
 INSERT INTO mcp_servers (name, transport, url, env, enabled)
 VALUES ('ScopeSentry', 'http', NULL, '{"X-API-Key":""}', false)
 ON CONFLICT (name) DO NOTHING;
@@ -872,7 +872,7 @@ CREATE TABLE IF NOT EXISTS mcp_tools_cache (
 );
 
 -- =====================================================================
--- G. 可见性：agent × mcp / skill
+-- G. 가시성 : agent × mcp / skill
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS agent_visibility (
     agent_id      BIGINT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -894,9 +894,9 @@ CREATE TABLE IF NOT EXISTS agent_skill_visibility (
 );
 CREATE INDEX IF NOT EXISTS idx_askv_skill ON agent_skill_visibility(skill_name);
 
--- Skill 调用账本（见 db/skill_usage.go）。一次 Skill() 调用一行，只记维度不记正文。
--- 刻意不设外键：任务/会话删除后统计仍要保留（与 llm_usage 同理），skill 本身也只是
--- 文件系统上的目录名，没有对应的表。
+-- Skill 원장에게 전화하십시오 (참조 db/skill_usage.go）。한 번 Skill() 라인을 호출하면 치수만 기억되고 텍스트는 기억되지 않습니다.。
+-- 의도적으로 외래 키를 설정하지 마십시오. 작업/세션이 삭제된 후에도 통계는 계속 유지됩니다(llm_usage와 동일). skill 자체는 단지
+-- 파일 시스템에는 디렉터리 이름에 해당하는 테이블이 없습니다.
 CREATE TABLE IF NOT EXISTS skill_usage (
     id             BIGSERIAL PRIMARY KEY,
     ts             TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -907,15 +907,15 @@ CREATE TABLE IF NOT EXISTS skill_usage (
     intent_id      BIGINT,
     session_id     TEXT,
     args_len       INTEGER NOT NULL DEFAULT 0,
-    -- false = 模型点名了一个不存在的 skill(未命中)。这类行同样保留：它反映"想用但没有"
-    -- 的缺口，是补 skill 的依据。
+    -- false = 존재하지 않는 skill라는 이름의 모델입니다(누락). 이 유형의 라인도 예약되어 있습니다. "사용하고 싶었지만 갖고 있지 않았습니다"를 반영합니다.
+    -- 간격은 skill를 채우는 기초입니다.
     found          BOOLEAN NOT NULL DEFAULT true
 );
 CREATE INDEX IF NOT EXISTS idx_skill_usage_skill ON skill_usage(skill, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_skill_usage_task  ON skill_usage(task_id);
 
--- 工具调用账本（见 db/tool_usage.go）。一次实际 CoreTool.Call 一行，只记归属维度，
--- 不保存工具参数或返回内容。刻意不设外键，任务、会话或自定义工具删除后仍保留统计。
+-- 도구 호출 원장(참조 db/tool_usage.go）。실제 CoreTool.Call 한 줄, 기여 측정기준만 기억하세요，
+-- 도구 매개변수를 저장하거나 콘텐츠를 반환하지 않습니다. 의도적으로 외래 키가 없으며 작업, 세션 또는 사용자 정의 도구가 삭제된 후에도 통계가 유지됩니다.
 CREATE TABLE IF NOT EXISTS tool_usage (
     id             BIGSERIAL PRIMARY KEY,
     ts             TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -930,7 +930,7 @@ CREATE INDEX IF NOT EXISTS idx_tool_usage_tool ON tool_usage(tool_key, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_tool_usage_task ON tool_usage(task_id);
 
 -- =====================================================================
--- H. 内置工具目录
+-- H. 내장 도구 디렉토리
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS tools (
     key         TEXT PRIMARY KEY,
@@ -949,7 +949,7 @@ CREATE TRIGGER trg_tools_upd BEFORE UPDATE ON tools
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =====================================================================
--- I. 会话（对话页）
+-- I. 대화(대화 페이지)
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS conversations (
     id             BIGSERIAL PRIMARY KEY,
@@ -988,7 +988,7 @@ CREATE INDEX IF NOT EXISTS idx_conv_act_tool_call ON conversation_activities(con
   WHERE kind IN ('tool_use', 'tool_result');
 
 -- =====================================================================
--- J. Agent 触发器
+-- J. Agent 플립플롭
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS agent_triggers (
     id                          BIGSERIAL PRIMARY KEY,
@@ -1012,7 +1012,7 @@ CREATE TABLE IF NOT EXISTS agent_triggers (
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_agent_triggers_agent ON agent_triggers(agent_key);
--- 加列迁移(已发版,旧库升级补列;新库 CREATE 已含这些列,ALTER 为 no-op)。幂等,每次启动可重复执行。
+-- 열 마이그레이션(이미 출시되었으며 이전 데이터베이스는 열을 추가하도록 업그레이드되었습니다. 새 데이터베이스 CREATE에는 이미 이러한 열이 포함되어 있으며 ALTER는 no-op입니다.) 멱등적이므로 시작할 때마다 반복적으로 실행될 수 있습니다.
 ALTER TABLE agent_triggers ADD COLUMN IF NOT EXISTS on_tool_call        BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE agent_triggers ADD COLUMN IF NOT EXISTS tool_call_message   TEXT    NOT NULL DEFAULT '';
 ALTER TABLE agent_triggers ADD COLUMN IF NOT EXISTS tool_names          TEXT    NOT NULL DEFAULT '';
@@ -1028,7 +1028,7 @@ CREATE TABLE IF NOT EXISTS scheduler_state (
 );
 
 -- =====================================================================
--- K. 拦截规则
+-- K. 차단 규칙
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS intercept_rules (
     id              BIGSERIAL PRIMARY KEY,
@@ -1060,42 +1060,42 @@ CREATE TABLE IF NOT EXISTS intercept_pending (
     tool_input      JSONB NOT NULL DEFAULT '{}',
     status          TEXT NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending', 'allowed', 'denied', 'timeout')),
-    -- 判定理由:规则命中时为规则 message;LLM 兜底判定时为模型给的简短理由(前缀 [模型])。
+    -- 판단 이유:규칙은 부딪힐 때 규칙이다 message;LLM 결정을 내릴 때 모델에 주어진 간략한 이유(접두사 [모델])。
     reason          TEXT NOT NULL DEFAULT '',
     decided_at      TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_intercept_pending_status ON intercept_pending(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_intercept_pending_task   ON intercept_pending(task_id, created_at DESC);
--- 补旧库:reason 列(已发版,加列要带 IF NOT EXISTS)。
+-- 기존 라이브러리 보충: reason 열(이미 게시됨, IF NOT EXISTS 추가)
 ALTER TABLE intercept_pending ADD COLUMN IF NOT EXISTS reason TEXT NOT NULL DEFAULT '';
 -- Detail payloads are lazy-loaded; NULL preserves the meaning of legacy history.
 ALTER TABLE intercept_pending ADD COLUMN IF NOT EXISTS audit JSONB;
 ALTER TABLE intercept_pending ADD COLUMN IF NOT EXISTS decision_source TEXT NOT NULL DEFAULT '';
 UPDATE intercept_pending SET decision_source=CASE WHEN rule_id IS NOT NULL THEN 'rule'
- WHEN reason LIKE '[模型]%' THEN 'model' ELSE 'unknown' END WHERE decision_source='';
+ WHEN reason LIKE '[모델]%' THEN 'model' ELSE 'unknown' END WHERE decision_source='';
 
 -- =====================================================================
--- L. 漏洞发现持久化
+-- L. 취약점 발견 지속성
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS findings (
     id          BIGSERIAL PRIMARY KEY,
     task_id     BIGINT REFERENCES tasks(id) ON DELETE SET NULL,
     node_id     BIGINT REFERENCES exploration_nodes(id) ON DELETE SET NULL,
     vulnclass   TEXT NOT NULL DEFAULT '',
-    -- 漏洞名称(可读标题)；为空时前端回退展示 vulnclass。severity 取值：
-    -- critical 严重 / high 高 / medium 中 / low 低（不加 CHECK，与 status 一致由 server 白名单校验）。
+    -- 취약점 이름(읽을 수 있는 제목) 비어 있으면 프런트 엔드가 다시 vulnclass로 표시됩니다. severity 값:
+    -- critical 심각 / high 높음 / medium 중간 / low 낮음(CHECK를 추가하지 않고 status와 일치하며 server 화이트리스트로 확인됨).
     name        TEXT NOT NULL DEFAULT '',
     severity    TEXT NOT NULL DEFAULT '',
     summary     TEXT NOT NULL DEFAULT '',
     evidence    TEXT NOT NULL DEFAULT '',
     worker      TEXT NOT NULL DEFAULT '',
     asset_ids   JSONB NOT NULL DEFAULT '[]',
-    -- 处置状态：pending 待处理 / in_progress 处理中 / confirmed 已确认 / resolved 已处理 / fixed 已修复 /
-    -- false_positive 误报 / ignored 忽略 / duplicate 重复 / risk_accepted 风险接受。
-    -- 取值不加 CHECK：旧库靠下面的 ALTER 补列,CHECK 无法回填,统一由 server 侧白名单校验。
+    -- 폐기 상태: pending 보류 중 / in_progress 처리 중 / confirmed 확인 / resolved 처리됨 / fixed 수리됨 /
+    -- false_positive 거짓 긍정 / ignored 무시 / duplicate 중복 / risk_accepted 위험이 승인되었습니다.
+    -- 값에 CHECK를 추가하지 마십시오. 이전 데이터베이스는 아래 ALTER로 보완되고, CHECK는 백필될 수 없으며, server 측 화이트리스트에 의해 균일하게 확인됩니다.
     status      TEXT NOT NULL DEFAULT 'pending',
-    -- 漏洞详细报告(Markdown)；默认空,仅详情页读取/展示,不进列表接口以免 payload 膨胀。
+    -- 취약점 상세 보고서(Markdown) 기본값은 비어 있고 세부 정보 페이지만 읽고 표시되며 payload 확장을 피하기 위해 목록 인터페이스가 입력되지 않습니다.
     report      TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -1105,10 +1105,10 @@ ALTER TABLE findings ADD COLUMN IF NOT EXISTS report TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_findings_task ON findings(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_findings_time ON findings(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(status, created_at DESC);
--- 「按资产」视图靠 asset_ids @> '[<id>]' 反查发现,没有这个 GIN 索引就是全表扫。
+-- "자산별" 보기는 asset_ids @> '[<id>]'를 사용하며 역방향 검사를 통해 이 GIN 인덱스가 없으면 전체 테이블이 스캔되는 것으로 나타났습니다.
 CREATE INDEX IF NOT EXISTS idx_findings_asset_ids ON findings USING GIN(asset_ids jsonb_path_ops);
 
--- 手动复测属于独立会话；结论与原漏洞处置状态分开保存。
+-- 수동 재테스트는 독립적인 세션입니다. 결론은 원래 취약점 해결 상태와 별도로 저장됩니다.
 CREATE TABLE IF NOT EXISTS finding_retests (
     id BIGSERIAL PRIMARY KEY,
     finding_id BIGINT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
@@ -1128,10 +1128,10 @@ CREATE INDEX IF NOT EXISTS idx_finding_retests_history ON finding_retests(findin
 CREATE UNIQUE INDEX IF NOT EXISTS idx_finding_retests_active ON finding_retests(finding_id)
     WHERE status IN ('pending','running');
 
--- 删除会话保留复测记录，同时解除尚未结束的复测占用。
+-- 재시험 기록을 유지하려면 세션을 삭제하고, 동시에 완료되지 않은 재시험 직업을 취소하십시오.
 CREATE OR REPLACE FUNCTION stop_deleted_conversation_retest() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    UPDATE finding_retests SET status='stopped', error='复测会话已删除', finished_at=now()
+    UPDATE finding_retests SET status='stopped', error='재테스트 세션이 삭제되었습니다.', finished_at=now()
     WHERE conversation_id=OLD.id AND status IN ('pending','running');
     RETURN OLD;
 END;
@@ -1174,7 +1174,7 @@ CREATE INDEX IF NOT EXISTS idx_finding_traffic_order ON finding_traffic_bindings
 CREATE INDEX IF NOT EXISTS idx_finding_traffic_snapshot ON finding_traffic_bindings(snapshot_id);
 
 -- =====================================================================
--- M. 后端日志持久化
+-- M. 백엔드 로그 지속성
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS server_logs (
     id         BIGSERIAL PRIMARY KEY,
@@ -1229,14 +1229,14 @@ ALTER TABLE side_question_sessions ADD COLUMN IF NOT EXISTS memory JSONB NOT NUL
 ALTER TABLE side_question_requests ADD COLUMN IF NOT EXISTS context_info JSONB NOT NULL DEFAULT '{}';
 
 -- =====================================================================
--- 资产拦截规则（全局黑名单）
--- 独立于 §K 命令拦截(intercept_rules)：intercept_rules 匹配工具名/入参文本，
--- 这张表匹配「目标资产」——全等/模糊的域名·IP·URL 以及 CIDR 网段。
--- 仅存规则；具体的匹配/拦截逻辑在别处实现。
--- kind 七种：
---   exact_domain / exact_ip / exact_url  —— 全等匹配
---   fuzzy_domain / fuzzy_ip / fuzzy_url  —— 模糊匹配
---   cidr                                 —— CIDR 网段
+-- 자산 차단 규칙(글로벌 블랙리스트)
+-- §K 명령 차단(intercept_rules)과 무관: intercept_rules는 도구 이름/입력 매개변수 텍스트와 일치합니다.
+-- 이 테이블은 "대상 자산"(합동/퍼지 도메인 이름·IP·URL 및 CIDR 네트워크 세그먼트)과 일치합니다.
+-- 규칙만 남습니다. 특정 일치/가로채기 논리는 다른 곳에서 구현됩니다.
+-- kind 7가지 유형:
+--   exact_domain / exact_ip / exact_url - 합동 매칭
+--   fuzzy_domain / fuzzy_ip / fuzzy_url - 퍼지 매칭
+--   cidr —— CIDR 네트워크 세그먼트
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS asset_intercept_rules (
     id          BIGSERIAL PRIMARY KEY,
@@ -1257,12 +1257,12 @@ CREATE TRIGGER trg_asset_intercept_rules_upd BEFORE UPDATE ON asset_intercept_ru
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =====================================================================
--- 任务级资产拦截/允许规则
--- 与全局 asset_intercept_rules 同构（kind/pattern/note/enabled），但按 task_id
--- 关联、随任务级联删除；创建任务时录入、任务详情里可编辑。
--- action: 'block'=拦截(禁止测试)  'allow'=允许(白名单)。
--- 执行判定：先按 拦截规则(全局 ∪ 任务block) 匹配，命中即禁止；未命中且该任务存在
--- 启用的 allow 规则时，须命中某条 allow 才放行，否则「不允许测试」。
+-- 작업 수준 자산 차단/허용 규칙
+-- 전역 asset_intercept_rules(kind/pattern/note/enabled)와 동형이지만 task_id와 같습니다.
+-- 작업과의 연관 및 계단식 삭제 작업을 생성할 때 입력하고 작업 세부정보에서 편집할 수 있습니다.
+-- action: 'block'=차단(테스트 금지) 'allow'=허용(허용 목록).
+-- 실행 판단: 먼저 차단 규칙(글로벌 ∪ 작업 블록)과 일치합니다. 맞으면 금지됩니다. 적중하지 않으면 작업이 존재하는 것입니다.
+-- allow 규칙이 활성화되면 테스트가 허용되기 전에 특정 allow가 적중되어야 하며, 그렇지 않으면 "테스트가 허용되지 않습니다".
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS task_intercept_rules (
     id          BIGSERIAL PRIMARY KEY,
@@ -1279,35 +1279,35 @@ CREATE TABLE IF NOT EXISTS task_intercept_rules (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_task_intercept_task ON task_intercept_rules(task_id);
--- 补旧库(本会话早前建过该表、无 action 列)：加列(带 IF NOT EXISTS)。
+-- 기존 데이터베이스를 보완합니다(테이블은 이 세션에서 이전에 생성되었으며 action 열이 없음). 열을 추가합니다(IF NOT EXISTS 사용).
 ALTER TABLE task_intercept_rules ADD COLUMN IF NOT EXISTS action TEXT NOT NULL DEFAULT 'block';
 DROP TRIGGER IF EXISTS trg_task_intercept_rules_upd ON task_intercept_rules;
 CREATE TRIGGER trg_task_intercept_rules_upd BEFORE UPDATE ON task_intercept_rules
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =====================================================================
--- M. 漏洞 IM 推送
+-- M. 취약점 IM 푸시
 --
--- 三张表刻意分开，核心是**爆炸半径**：写漏洞的那个事务(RecordFindingTx，
--- 持任务行锁)只允许做一次盲 INSERT，不读渠道表、不跑用户的过滤规则。否则
--- 一条配错的 webhook 过滤条件就能污染/中止事务，导致漏洞存不进去。
+-- 세 개의 테이블은 의도적으로 분리되었습니다. 핵심은 **폭발 반경**: 취약점을 작성하는 트랜잭션(RecordFindingTx,
+-- 작업 행 잠금 보유)은 하나의 블라인드 INSERT만 허용하고 채널 테이블을 읽지 않으며 사용자의 필터링 규칙을 실행하지 않습니다. 그렇지 않으면
+-- 일치하지 않는 webhook 필터 조건은 트랜잭션을 오염/중단하여 취약점이 저장되지 않도록 할 수 있습니다.
 --
---   notification_channels   渠道实例配置(可变、含凭据、UI 管理)
---   notification_events     事件事实(写漏洞事务内盲插，含渲染快照)
---   notification_deliveries 投递任务(事务外 fan-out 产生，承载状态/重试/批次)
+--   notification_channels 채널 인스턴스 구성(자격 증명, UI 관리를 포함한 변수)
+--   notification_events 이벤트 사실(스냅샷 렌더링을 포함하여 쓰기 취약점 트랜잭션 내 블라인드 삽입)
+--   notification_deliveries 전달 작업(트랜잭션 외부에서 생성된 fan-out, 상태/재시도/배치 전달)
 -- =====================================================================
 
--- 渠道实例：同一 kind 可配任意多个(如「应急群」「日常群」各一个钉钉机器人)。
--- kind 取值由 server 侧白名单校验，不加 CHECK：与 findings.status 同理，
--- 后续加渠道不应要求改表结构。
+-- 채널 예: 동일한 kind를 원하는 만큼 할당할 수 있습니다(예: "긴급 그룹" 및 "데일리 그룹"에 대해 각각 하나의 DingTalk 로봇).
+-- kind의 값은 CHECK를 추가하지 않고 server 측면 화이트리스트로 확인됩니다. findings.status와 동일합니다.
+-- 이후에 채널을 추가할 때 테이블 구조를 변경할 필요가 없습니다.
 CREATE TABLE IF NOT EXISTS notification_channels (
     id           BIGSERIAL PRIMARY KEY,
     name         TEXT NOT NULL,
-    -- dingtalk 钉钉 / feishu 飞书 / wecom 企业微信 / webhook 通用 / telegram / email
+    -- dingtalk DingTalk / feishu Feishu / wecom 기업 위챗 / webhook 일반 / telegram / email
     kind         TEXT NOT NULL,
     enabled      BOOLEAN NOT NULL DEFAULT true,
-    -- 凭据(明文存储，UI 掩码回显；见 server 侧 maskChannelSecrets)。六种渠道字段差异极大，
-    -- 统一 JSONB + Go 侧按 kind 严格校验，避免为每渠道加一堆 NULL 列：
+    -- 자격 증명(일반 텍스트 저장소, UI 마스크 에코, server 측면 maskChannelSecrets 참조) 6개 채널의 필드는 매우 다릅니다.
+    -- 각 채널에 여러 NULL 열을 추가하지 않도록 JSONB + Go를 통합하고 엄격한 확인을 위해 kind를 누르세요.
     --   dingtalk {webhook,secret}
     --   feishu   {webhook,secret}
     --   wecom    {webhook}
@@ -1315,16 +1315,16 @@ CREATE TABLE IF NOT EXISTS notification_channels (
     --   telegram {bot_token,chat_id,base_url}
     --   email    {host,port,username,password,from,to[],tls}
     config       JSONB NOT NULL DEFAULT '{}',
-    -- 推送时机：realtime 命中即推 / digest 进批次按全局周期汇总成一条。
+    -- 푸시 타이밍: realtime는 적중 시 즉시 푸시됩니다. / digest 배치는 글로벌 주기에 따라 하나로 요약됩니다.
     mode         TEXT NOT NULL DEFAULT 'realtime',
-    -- 过滤条件，字段全部可选(缺省=不过滤)：
+    -- 필터 조건, 모든 필드는 선택 사항입니다(기본값 = 필터링 없음):
     --   min_severity       ''|low|medium|high|critical
-    --   task_ids/asset_ids 空数组=不限；非空则须交集非空
-    --   vulnclass_include/exclude 关键词数组(大小写不敏感子串)；include 空=全收
-    --   on_status_change   bool，仅 realtime 模式有意义
+    --   task_ids/asset_ids 빈 배열 = 제한 없음; 비어 있지 않은 경우 교차점은 비어 있지 않아야 합니다.
+    --   vulnclass_include/exclude 키워드 배열(대소문자를 구분하지 않는 하위 문자열); include 비어 있음 = 모두 허용
+    --   on_status_change bool, realtime 모드만 의미가 있습니다.
     filter       JSONB NOT NULL DEFAULT '{}',
-    -- 每分钟投递上限；0=不限流。默认 20 对齐钉钉/企微官方硬限。
-    -- 超限不丢消息，只把投递推迟到下一个 tick。
+    -- 분당 최대 전송 한도; 0=트래픽 제한이 없습니다. 기본값은 20이며 DingTalk/Qiwei의 공식 하드 제한에 맞춰져 있습니다.
+    -- 제한을 초과하면 메시지가 손실되지 않지만 전달은 다음 tick로 연기됩니다.
     rate_per_min INTEGER NOT NULL DEFAULT 20,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -1333,45 +1333,45 @@ DROP TRIGGER IF EXISTS trg_notification_channels_upd ON notification_channels;
 CREATE TRIGGER trg_notification_channels_upd BEFORE UPDATE ON notification_channels
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- 事件事实。由 RecordFindingTx / 状态变更事务**同事务**写入，保证「漏洞落库」
--- 与「推送任务存在」原子一致——不存在提交成功但没入队、消息永久丢失的窗口。
--- snapshot 刻意冗余：漏洞事后会被改名/改级别/改状态，推送内容应反映「事发当时」，
--- 且 fan-out 与渲染不必回查 findings/tasks/assets 多张表。
--- finding 删除后事件不级联删除：与 findings 表「任务删除仍独立留存」的语义一致。
+-- 이벤트의 사실. "취약점이 기록되었는지" 확인하기 위해 RecordFindingTx/상태 변경 트랜잭션 **동일 트랜잭션**에 의해 작성됨
+-- 이는 "푸시 작업 존재" 원자와 일치합니다. 제출이 성공했지만 대기열에 추가되지 않고 메시지가 영구적으로 손실되는 창이 없습니다.
+-- snapshot 의도적으로 중복됨: 취약점은 나중에 이름이 변경/레벨 지정/설명되며 푸시 콘텐츠는 "사고 시간"을 반영해야 합니다.
+-- 그리고 fan-out 및 렌더링은 findings/tasks/assets의 여러 테이블을 다시 볼 필요가 없습니다.
+-- finding 이벤트는 삭제 후 계단식으로 삭제되지 않습니다. findings 테이블 "작업 삭제는 독립적으로 유지됩니다"의 의미와 일치합니다.
 CREATE TABLE IF NOT EXISTS notification_events (
     id         BIGSERIAL PRIMARY KEY,
     -- finding_created | finding_status_changed
     kind       TEXT NOT NULL,
     finding_id BIGINT NOT NULL,
     snapshot   JSONB NOT NULL,
-    -- fan-out 幂等标记：dispatcher 按此列取待分派事件，处理完置 true。
-    -- 用列而非删行，以便投递历史能回溯到事件。
+    -- fan-out 멱등성 태그: dispatcher. 이 열을 클릭하면 이벤트가 전달되도록 하고 처리 후 true를 설정합니다.
+    -- 전송 기록이 이벤트로 돌아가도록 행을 삭제하는 대신 열을 사용하세요.
     fanned_out BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_notification_events_pending
     ON notification_events(id) WHERE NOT fanned_out;
 
--- 投递任务：一条事件 × 一个启用渠道 = 一行。fan-out 在事务外做，所以渠道
--- 后开不会补历史(与 agent_triggers 的「迟开 trigger 不补历史」语义一致，
--- 避免启用渠道时一次性刷屏历史积压)。
--- channel_id 级联删除：渠道配置都没了，其投递历史无意义。
+-- 전달 작업: 이벤트 1개 × 활성화된 채널 1개 = 행 1개. fan-out는 트랜잭션 외부에서 수행되므로 채널
+-- 나중에 열면 이력이 보충되지 않습니다(agent_triggers의 "늦은 열림 trigger가 이력을 보충하지 않습니다"와 동일한 의미,
+-- 채널이 활성화되면 기록 백로그를 일회성으로 새로 고치지 마세요.
+-- channel_id 캐스케이드 삭제: 채널 구성이 사라져 전송 기록이 의미가 없습니다.
 CREATE TABLE IF NOT EXISTS notification_deliveries (
     id          BIGSERIAL PRIMARY KEY,
     event_id    BIGINT NOT NULL REFERENCES notification_events(id) ON DELETE CASCADE,
     channel_id  BIGINT NOT NULL REFERENCES notification_channels(id) ON DELETE CASCADE,
-    -- pending 待发 / sent 已发 / failed 重试耗尽(可手动重发) / skipped 渠道停用或批次取消
-    -- pending 待发 / sending 已被某 dispatcher 领取(租约未到期) / sent 已发 /
-    -- failed 重试耗尽或永久失败(可手动重发) / skipped 渠道停用。取值不加 CHECK，
-    -- 与 findings.status 同理，由 server 侧白名单校验。
+    -- pending 전송 예정 / sent 전송됨 / failed 재시도가 소진됨(수동으로 재전송 가능) / skipped 채널 비활성화 또는 일괄 취소됨
+    -- pending가 전송 대기 중 / sending가 특정 dispatcher에 의해 수집되었습니다(리스가 만료되지 않음) / sent가 전송되었습니다 /
+    -- failed 재시도 횟수가 소진되었거나 영구적으로 실패했습니다. (수동 재전송 가능) / skipped 채널이 비활성화되었습니다. 값에 CHECK를 추가하지 마십시오.
+    -- findings.status, server 측 화이트리스트 확인과 동일합니다.
     state       TEXT NOT NULL DEFAULT 'pending',
     attempts    INTEGER NOT NULL DEFAULT 0,
-    -- 兼作「下次可领取时间」与「租约到期时间」：领取时把它推到未来即构成租约，
-    -- 于是「租约未到期」与「未到重试时间」共用同一个条件表达，不需要额外的
-    -- lease_until 列。进程崩溃留下的 sending 行会因租约到期被下一轮重新领取。
+    -- 이는 또한 "다음에 수집할 수 있는 시간" 및 "임대 만료 시간"의 역할도 합니다. 수집할 때 미래로 미는 것은 임대를 구성합니다.
+    -- 따라서 "임대 기간이 만료되지 않았습니다"와 "재시도 시간이 만료되지 않았습니다"는 동일한 조건식을 공유하며 추가 사항이 없습니다.
+    -- lease_until 컬럼. 프로세스 충돌로 인해 남겨진 sending 행은 임대 만료로 인해 다음 라운드에서 다시 획득됩니다.
     next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_error  TEXT NOT NULL DEFAULT '',
-    -- digest 模式同批次共享；realtime 恒为 NULL。整批渲染成一条消息后一起置 sent。
+    -- digest 모드는 배치와 공유됩니다. realtime는 항상 NULL입니다. 전체 배치가 하나의 메시지로 렌더링된 다음 sent로 설정됩니다.
     batch_id    BIGINT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     sent_at     TIMESTAMPTZ

@@ -1,12 +1,12 @@
 ---
 name: playwright-cli
-description: Automate browser interactions, test web pages and work with Playwright tests.
+description: 브라우저 상호 작용을 자동화하고, 웹 페이지를 테스트하고, Playwright 테스트를 사용하세요.
 allowed-tools: Bash(playwright-cli:*) Bash(npx:*) Bash(npm:*)
 ---
 
-# Browser Automation with playwright-cli
+# playwright-cli를 사용한 브라우저 자동화
 
-## Quick start
+## 빠른 시작
 
 ```bash
 # open new browser
@@ -23,9 +23,9 @@ playwright-cli screenshot
 playwright-cli close
 ```
 
-## Commands
+## 명령
 
-### Core
+### 핵심
 
 ```bash
 playwright-cli open
@@ -64,7 +64,7 @@ playwright-cli resize 1920 1080
 playwright-cli close
 ```
 
-### Navigation
+### 항해
 
 ```bash
 playwright-cli go-back
@@ -72,7 +72,7 @@ playwright-cli go-forward
 playwright-cli reload
 ```
 
-### Keyboard
+### 건반
 
 ```bash
 playwright-cli press Enter
@@ -81,7 +81,7 @@ playwright-cli keydown Shift
 playwright-cli keyup Shift
 ```
 
-### Mouse
+### 생쥐
 
 ```bash
 playwright-cli mousemove 150 300
@@ -92,7 +92,7 @@ playwright-cli mouseup right
 playwright-cli mousewheel 0 100
 ```
 
-### Save as
+### 다른 이름으로 저장
 
 ```bash
 playwright-cli screenshot
@@ -102,7 +102,7 @@ playwright-cli screenshot --hires
 playwright-cli pdf --filename=page.pdf
 ```
 
-### Tabs
+### 탭
 
 ```bash
 playwright-cli tab-list
@@ -113,7 +113,7 @@ playwright-cli tab-close 2
 playwright-cli tab-select 0
 ```
 
-### Storage
+### 저장
 
 ```bash
 playwright-cli state-save
@@ -144,7 +144,7 @@ playwright-cli sessionstorage-delete step
 playwright-cli sessionstorage-clear
 ```
 
-### Network
+### 회로망
 
 ```bash
 playwright-cli route "**/*.jpg" --status=404
@@ -154,7 +154,7 @@ playwright-cli unroute "**/*.jpg"
 playwright-cli unroute
 ```
 
-### DevTools
+### 개발자 도구
 
 ```bash
 playwright-cli console
@@ -187,9 +187,9 @@ playwright-cli highlight e5 --hide
 playwright-cli highlight --hide
 ```
 
-## Raw output
+## 원시 출력
 
-The global `--raw` option strips page status, generated code, and snapshot sections from the output, returning only the result value. Use it to pipe command output into other tools. Commands that don't produce output return nothing.
+전역 `--raw` 옵션은 출력에서 ​​페이지 상태, 생성된 코드 및 스냅샷 섹션을 제거하고 결과 값만 반환합니다. 명령 출력을 다른 도구로 파이프하는 데 사용합니다. 출력을 생성하지 않는 명령은 아무것도 반환하지 않습니다.
 
 ```bash
 playwright-cli --raw eval "JSON.stringify(performance.timing)" | jq '.loadEventEnd - .navigationStart'
@@ -202,12 +202,12 @@ TOKEN=$(playwright-cli --raw cookie-get session_id)
 playwright-cli --raw localstorage-get theme
 ```
 
-For structured output wrapping every reply as JSON, pass --json
+모든 응답을 JSON으로 래핑하는 구조화된 출력의 경우 --json을 전달합니다.
 ```bash
 playwright-cli list --json
 ```
 
-## Open parameters
+## 매개변수 열기
 ```bash
 # Use specific browser when creating session
 playwright-cli open --browser=chrome
@@ -247,9 +247,9 @@ playwright-cli -s=msedge detach
 playwright-cli delete-data
 ```
 
-## URLs with `&` on Windows
+## Windows에서 `&`가 포함된 URL
 
-On Windows, `cmd.exe` and PowerShell treat `&` as a command separator, so URLs with multiple query parameters get truncated before `playwright-cli` runs. Escape `&` with `^&` in `cmd.exe`, or use `--%` in PowerShell:
+Windows에서 `cmd.exe` 및 PowerShell은 `&`를 명령 구분 기호로 처리하므로 `playwright-cli`가 실행되기 전에 여러 쿼리 매개 변수가 있는 URL이 잘립니다. `cmd.exe`에서 `^&`를 사용하여 `&`를 이스케이프하거나 PowerShell에서 `--%`를 사용합니다.
 
 ```batch
 playwright-cli goto "https://example.com/?a=1^&b=2"
@@ -259,9 +259,9 @@ playwright-cli goto "https://example.com/?a=1^&b=2"
 playwright-cli --% goto "https://example.com/?a=1&b=2"
 ```
 
-## Snapshots
+## 스냅샷
 
-After each command, playwright-cli provides a snapshot of the current browser state.
+각 명령 후에 playwright-cli는 현재 브라우저 상태의 스냅샷을 제공합니다.
 
 ```bash
 > playwright-cli goto https://example.com
@@ -272,7 +272,7 @@ After each command, playwright-cli provides a snapshot of the current browser st
 [Snapshot](.playwright-cli/page-2026-02-14T19-22-42-679Z.yml)
 ```
 
-You can also take a snapshot on demand using `playwright-cli snapshot` command. All the options below can be combined as needed.
+`playwright-cli snapshot` 명령을 사용하여 요청 시 스냅샷을 찍을 수도 있습니다. 아래의 모든 옵션은 필요에 따라 결합될 수 있습니다.
 
 ```bash
 # default - save to a file with timestamp-based name
@@ -297,9 +297,9 @@ playwright-cli find "Add to cart"
 playwright-cli find --regex "\\$[0-9]+\\.[0-9]{2}"
 ```
 
-## Targeting elements
+## 타겟팅 요소
 
-By default, use refs from the snapshot to interact with page elements.
+기본적으로 스냅샷의 참조를 사용하여 페이지 요소와 상호 작용합니다.
 
 ```bash
 # get snapshot with refs
@@ -309,7 +309,7 @@ playwright-cli snapshot
 playwright-cli click e15
 ```
 
-You can also use css selectors or Playwright locators.
+CSS 선택기나 Playwright 로케이터를 사용할 수도 있습니다.
 
 ```bash
 # css selector
@@ -322,7 +322,7 @@ playwright-cli click "getByRole('button', { name: 'Submit' })"
 playwright-cli click "getByTestId('submit-button')"
 ```
 
-## Browser Sessions
+## 브라우저 세션
 
 ```bash
 # create new browser session named "mysession" with persistent profile
@@ -340,21 +340,21 @@ playwright-cli close-all
 playwright-cli kill-all
 ```
 
-## Installation
+## 설치
 
-If global `playwright-cli` command is not available, try a local version via `npx playwright cli`:
+글로벌 `playwright-cli` 명령을 사용할 수 없는 경우 `npx playwright cli`를 통해 로컬 버전을 사용해 보십시오.
 
 ```bash
 npx --no-install playwright --version
 ```
 
-When local version is available, use `npx playwright cli` in all commands. Otherwise, install `playwright-cli` as a global command:
+로컬 버전을 사용할 수 있는 경우 모든 명령에서 `npx playwright cli`를 사용하십시오. 그렇지 않으면 `playwright-cli`를 전역 명령으로 설치하십시오.
 
 ```bash
 npm install -g @playwright/cli@latest
 ```
 
-## Example: Form submission
+## 예: 양식 제출
 
 ```bash
 playwright-cli open https://example.com/form
@@ -367,7 +367,7 @@ playwright-cli snapshot
 playwright-cli close
 ```
 
-## Example: Multi-tab workflow
+## 예: 다중 탭 작업 흐름
 
 ```bash
 playwright-cli open https://example.com
@@ -378,7 +378,7 @@ playwright-cli snapshot
 playwright-cli close
 ```
 
-## Example: Debugging with DevTools
+## 예: DevTools를 사용한 디버깅
 
 ```bash
 playwright-cli open https://example.com
@@ -398,23 +398,23 @@ playwright-cli tracing-stop
 playwright-cli close
 ```
 
-## Example: Interactive session
+## 예: 대화형 세션
 
-Ask the user for UI review or design feedback. The user draws boxes on the live page and types comments; you receive the annotated screenshot, the snapshot of the marked region, and the user's notes. Use this whenever the user asks for "UI review", "design feedback", or to "ask the user what they think / want / mean":
+사용자에게 UI 검토 또는 디자인 피드백을 요청하세요. 사용자는 라이브 페이지에 상자를 그리고 댓글을 입력합니다. 주석이 달린 스크린샷, 표시된 영역의 스냅샷, 사용자 메모를 받게 됩니다. 사용자가 "UI 검토", "디자인 피드백"을 요청하거나 "사용자에게 생각/원하는/의미가 무엇인지 물어보기"를 요청할 때마다 이 방법을 사용하세요.
 
 ```bash
 playwright-cli open https://example.com
 playwright-cli show --annotate
 ```
 
-## Specific tasks
+## 특정 작업
 
-* **Running and Debugging Playwright tests** [references/playwright-tests.md](references/playwright-tests.md)
-* **Request mocking** [references/request-mocking.md](references/request-mocking.md)
-* **Running Playwright code** [references/running-code.md](references/running-code.md)
-* **Browser session management** [references/session-management.md](references/session-management.md)
-* **Storage state (cookies, localStorage)** [references/storage-state.md](references/storage-state.md)
-* **Test generation (plan / generate / heal)** [references/test-generation.md](references/test-generation.md)
-* **Tracing** [references/tracing.md](references/tracing.md)
-* **Video recording** [references/video-recording.md](references/video-recording.md)
-* **Inspecting element attributes** [references/element-attributes.md](references/element-attributes.md)
+* **Playwright 테스트 실행 및 디버깅** [references/playwright-tests.md](references/playwright-tests.md)
+* **모의 요청** [references/request-mocking.md](references/request-mocking.md)
+* **Playwright 코드 실행** [references/running-code.md](references/running-code.md)
+* **브라우저 세션 관리** [references/session-management.md](references/session-management.md)
+* **저장소 상태(쿠키, localStorage)** [references/storage-state.md](references/storage-state.md)
+* **테스트 생성(계획/생성/치료)** [references/test-gener.md](references/test-generation.md)
+* **추적** [references/tracing.md](references/tracing.md)
+* **영상 녹화** [references/video-recording.md](references/video-recording.md)
+* **요소 속성 검사 중** [references/element-attributes.md](references/element-attributes.md)

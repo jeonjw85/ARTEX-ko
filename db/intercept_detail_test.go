@@ -16,7 +16,7 @@ func TestInterceptDetails(t *testing.T) {
 	t.Cleanup(func() { _ = d.Close() })
 	create := func(t *testing.T, audit *InterceptAudit) int64 {
 		t.Helper()
-		id, err := d.CreateInterceptPending(0, 0, "approval-detail-test", "test", "Write", []byte(`{"path":"report.md"}`), "[模型] 请确认", audit)
+		id, err := d.CreateInterceptPending(0, 0, "approval-detail-test", "test", "Write", []byte(`{"path":"report.md"}`), "[모델] 확인해주세요", audit)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,6 +28,15 @@ func TestInterceptDetails(t *testing.T) {
 		got, err := d.GetInterceptDetail(id)
 		if err != nil || got == nil || got.Audit != nil {
 			t.Fatalf("legacy: %+v %v", got, err)
+		}
+		for _, reason := range []string{"[모델] 확인 요청", "[模型] 기존 승인 기록"} {
+			if _, err := d.Exec(`UPDATE intercept_pending SET decision_source='', reason=$1 WHERE id=$2`, reason, id); err != nil {
+				t.Fatal(err)
+			}
+			got, err := d.GetInterceptDetail(id)
+			if err != nil || got == nil || got.DecisionSource != "model" {
+				t.Fatalf("model source for %q: %+v %v", reason, got, err)
+			}
 		}
 		create(t, &InterceptAudit{UserMessage: "snapshot-only-marker", InitialAction: "ask"})
 		items, err := d.ListTaskIntercepts("approval-detail-test")
@@ -49,7 +58,7 @@ func TestInterceptDetails(t *testing.T) {
 		var wg sync.WaitGroup
 		for range 8 {
 			wg.Go(func() {
-				ok, err := d.ResolveIntercept(id, "allowed", "allow", "人工允许执行")
+				ok, err := d.ResolveIntercept(id, "allowed", "allow", "수동으로 허용된 실행")
 				if err != nil {
 					t.Error(err)
 				}
@@ -90,7 +99,7 @@ func TestInterceptDetails(t *testing.T) {
 	})
 	t.Run("denied output and timeout allow", func(t *testing.T) {
 		id := create(t, &InterceptAudit{RunID: "run", ToolUseID: "call", ExecutionStatus: "not_started"})
-		if _, err := d.ResolveIntercept(id, "denied", "deny", "人工拒绝"); err != nil {
+		if _, err := d.ResolveIntercept(id, "denied", "deny", "수동 거부"); err != nil {
 			t.Fatal(err)
 		}
 		if err := d.CompleteIntercept(id, "run", "call", "failed", "Blocked by hook", false); err != nil {
@@ -101,7 +110,7 @@ func TestInterceptDetails(t *testing.T) {
 			t.Fatal("denial presented as executed")
 		}
 		id = create(t, &InterceptAudit{RunID: "run2", ToolUseID: "call2", Correlation: "exact", InitialAction: "ask"})
-		if _, err := d.ResolveIntercept(id, "timeout", "allow", "超时允许"); err != nil {
+		if _, err := d.ResolveIntercept(id, "timeout", "allow", "시간 초과가 허용됨"); err != nil {
 			t.Fatal(err)
 		}
 		if err := d.CompleteIntercept(id, "run2", "call2", "succeeded", "ok", false); err != nil {

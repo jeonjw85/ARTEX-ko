@@ -33,8 +33,8 @@ export function NavUser({
 
   function handleLogout() {
     auth.clearToken();
-    // 硬跳转：让浏览器用已清除的 cookie 发起全新请求，
-    // middleware 才能正确读到空 token 并放行 /login
+    // 하드 점프: 브라우저가 지워진 cookie를 사용하여 새 요청을 시작하도록 합니다.
+    // middleware는 빈 token를 올바르게 읽고 /login를 릴리스할 수 있습니다.
     window.location.href = "/login";
   }
 
@@ -79,12 +79,12 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setPwOpen(true)}>
               <KeyRound />
-              修改密码
+              비밀번호 변경
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
               <LogOut />
-              退出登录
+              로그아웃
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

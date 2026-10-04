@@ -402,8 +402,8 @@ FROM task_llm_profiles WHERE task_id=$1 ORDER BY position`, taskID)
 // ReplaceTaskLLMProfiles atomically replaces and resets the explicit task chain.
 // activeProfileID=0 selects the first entry. An empty list restores the existing
 // agent-binding/global fallback behavior.
-// 终态(done/failed/timeout)任务同样允许改链:任务结束后主 Agent 对话仍会走这条链,
-// 链上模型不可用时必须能换,否则已完成任务就再也没法交互了。
+// 최종 상태(done/failed/timeout) 작업은 체인 변경도 허용합니다. 작업이 완료된 후에도 기본 Agent 대화는 계속 이 체인을 따릅니다.
+// 체인의 모델은 사용할 수 없을 때 교체될 수 있어야 합니다. 그렇지 않으면 완료된 작업이 더 이상 상호 작용할 수 없습니다.
 func (d *DB) ReplaceTaskLLMProfiles(taskID int64, profileIDs []int64, activeProfileID int64) error {
 	tx, err := d.Begin()
 	if err != nil {

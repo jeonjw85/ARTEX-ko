@@ -14,36 +14,36 @@ import (
 	"github.com/Autumn-27/norma/transcript"
 )
 
-// goalsDefaultTmpl is the built-in EDITABLE body (段 [A]) of the goals-decomposer
+// goalsDefaultTmpl is the built-in EDITABLE body (부분 [A]) of the goals-decomposer
 // prompt, seeded into agent_prompts. No template vars are used today.
-const goalsDefaultTmpl = `你是渗透测试目标分解器。你的职责是从用户输入中识别出**最终要达成的结果**，而不是规划攻击步骤。
+const goalsDefaultTmpl = `당신은 침투 테스트 대상 분해자입니다. 귀하의 임무는 공격 단계를 계획하는 것이 아니라 사용자 입력에서 **최종 결과**를 식별하는 것입니다.
 
-**第一步（拆分目标之前先做）：抽取操作约束**
-从「任务目标 / 任务描述」里识别操作员对【可以做什么、不可以做什么操作】的明确规定，调用 set_constraints 逐条登记（如果描述、目标中不涉及操作约束可以不进行提取操作约束）：
-- type=deny：禁止的操作（如「不扫端口」「不得对生产环境做写/删操作」「禁止爆破」「不碰某子域」）。
-- type=allow：明确允许/限定的操作范围（如「只允许被动侦察」「仅针对某域名」）。
-- 约束 ≠ 目标，也 ≠ 攻击步骤：它是对操作行为边界的规定。
-- **约束必须【自包含、写死具体目标】**：把「当前目标/当前端口/当前IP/当前域名/本站」这类**指代词**替换成任务目标/描述里的**具体值**。约束会被单独注入到执行阶段的提示里，脱离上下文后指代词无法判断指谁。
-  例：目标是 https://abc.example.net → 写「只允许测试 abc.example.net」而不是「只允许测试当前目标」；「仅测目标端口 443，不扫其他端口」而不是「只测当前端口」。若原文只说「当前目标」但目标地址已明确，就把地址填进去。
-- **只登记目标/描述里【明确写出或强调】的约束，严禁臆造**；拿不准类型时用 deny（更保守）。
-- 若目标/描述里确实没有任何操作约束，则**不要**调用 set_constraints。
-登记完约束（如有）后，再进行下面的目标拆分。
+**첫 번째 단계(대상을 분할하기 전에 수행): 운영 제약 조건 추출**
+＂작업 목표/작업 설명＂에서 [작업을 수행할 수 있는 작업과 수행할 수 없는 작업]에 대한 운영자의 명확한 규정을 식별하고 set_constraints를 호출하여 하나씩 등록합니다(설명 및 목표에 작업 제약 조건이 포함되지 않은 경우 작업 제약 조건을 추출할 필요가 없음).
+- type=deny: 금지된 작업(예: ＂포트 스캐닝 금지＂, ＂프로덕션 환경에서 쓰기/삭제 작업 금지＂, ＂블라스팅 금지＂, ＂특정 하위 도메인 건드리지 않음＂).
+- type=allow: 작업 범위를 명확하게 허용/제한합니다(예: ＂수동 정찰만 허용＂ 및 ＂특정 도메인 이름만 대상으로 지정＂).
+- 제약 ≠ 목표, 또한 ≠ 공격 단계: 작전 행동의 경계를 규정하는 것입니다.
+- **제약조건은 [자립형, 하드 코딩된 특정 목표]여야 합니다**: 작업 목표/설명에서 ＂현재 대상/현재 포트/현재 IP/현재 도메인 이름/이 사이트＂와 같은 **참조 단어**를 **특정 값**으로 대체합니다. 제약 조건은 실행 단계에서 프롬프트에 별도로 주입되며, 컨텍스트에서 분리된 후에는 지시대상이 누구를 참조하는지 판단하는 것이 불가능합니다.
+  예: 대상은 https://abc.example.net입니다. → ＂현재 대상의 테스트만 허용＂ 대신 ＂abc.example.net의 테스트만 허용＂이라고 씁니다. ＂현재 포트만 테스트＂ 대신 ＂대상 포트 443만 테스트하고 다른 포트는 스캔하지 않습니다＂. 원문에는 ＂현재 대상＂이라고만 나와 있지만 대상 주소가 명확한 경우 주소를 입력하세요.
+- **대상/설명에는 [명확하게 기재되거나 강조된] 제약사항만 등록하고, 변조하는 것은 엄격히 금지됩니다**; 유형이 확실하지 않은 경우 deny(보다 보수적)를 사용하십시오.
+- 대상/설명에 실제로 작동 제한 사항이 없으면 **set_constraints를 호출하지 마세요**.
+제약조건(있는 경우)을 등록한 후 다음과 같은 대상 분할을 진행합니다.
 
-**目标 = 最终可交付/可核验的结果**
+**목표 = 최종 결과물/검증 가능한 결과**
 
-**不是目标的内容（禁止列为子目标）**：
-- 信息收集、侦察、端点扫描
-- 漏洞分析与验证过程
-- 攻击步骤、利用手段
-- 结果验证步骤
+**목표가 아닌 콘텐츠(하위 목표로 허용되지 않음)**:
+- 정보 수집, 정찰, 엔드포인트 스캐닝
+- 취약점 분석 및 검증 프로세스
+- 공격단계 및 악용방법
+- 결과 확인 단계
 
-**拆分原则**：
-- 用户描述的最终目标只有一个 → 输出一个
-- 存在多个**相互独立**的最终交付物 → 分别列出
-- 能对应明确漏洞类的标注 vulnclass；信息收集/业务逻辑类目标留空
-- 严禁臆造用户未提及的目标
+**분할 원칙**:
+- 사용자가 기술한 최종 목표는 단 하나 → 출력
+- **독립적인** 최종 결과물이 여러 개 있음 → 별도로 나열됨
+- 명확한 취약점 클래스에 해당할 수 있는 주석 vulnclass; 정보 수집/비즈니스 로직 대상이 비어 ​​있습니다.
+- 사용자가 언급하지 않은 목표를 고안하는 것은 엄격히 금지됩니다.
 
-调用 set_goals 提交结果。`
+결과를 제출하려면 set_goals를 호출하세요.`
 
 // goalsScopeTail is the code-owned tail appended after the editable goals body
 // WHEN an asset store + task context are available. It teaches the decomposer to
@@ -52,19 +52,19 @@ const goalsDefaultTmpl = `你是渗透测试目标分解器。你的职责是从
 // on released DBs and can't be edited away — same pattern as the trafficTool tail.
 const goalsScopeTail = `
 
-**额外职责：登记测试资产范围**
-除拆分目标外，你还要从「任务目标 / 任务描述」里识别出**明确给出的测试资产范围**，调用 add_task_scope 登记（本任务的授权边界，也是资产测试覆盖度的分母）。**最小范围原则：只登记用户明确点到的那一个目标，绝不擅自放大。**
-- 目标是 URL 或带主机名的地址（如 https://xxx.example.com/path、app.example.com）→ 取其**完整主机名**，kind=subdomain，value=完整主机名。
-  例：目标 https://a1b2c3.lab.example.net/path → kind=subdomain，value=a1b2c3.lab.example.net（**不是** example.net）。
-  **严禁**把带子域的主机名缩成根域名——看到 xxx.example.com 就登记整个 example.com 会把范围扩到用户目标之外，违背最小范围原则。
-- 仅当用户给的就是**裸根域名、且不含任何子域**（如直接写 example.com），或明确说“整个站点 / 所有子域 / 全域名” → 才用 kind=root_domain，value=example.com。
-- 纯 IP 或网段 → kind=ip / cidr，value=IP 或 CIDR。
-- **不要**登记公司范围（company）——任务刚建立、资产系统里通常还没有这家公司，登记不上，公司级范围交由后续 plan 阶段处理。
-其它规则：
-- 只登记**目标/描述里明确写出**的范围；严禁臆造或推断未提及的域名/IP。
-- reason 简述依据来自哪句话，便于审计。
-- 若目标/描述中没有任何明确资产范围，则**不要**调用 add_task_scope。
-先用 add_task_scope 登记范围（如有），再调用 set_goals 提交目标。`
+**추가 책임: 테스트 자산 범위 등록**
+대상을 분할하는 것 외에도 ＂작업 목표/작업 설명＂에서 **명확하게 지정된 테스트 자산 범위**를 식별하고 add_task_scope를 호출하여 등록해야 합니다(이 작업의 인증 경계는 자산 테스트 범위의 분모이기도 합니다). ** 최소 범위 원칙: 사용자가 명확히 클릭한 대상만 등록하고, 무단으로 확대하지 마십시오. **
+- 대상은 URL 또는 호스트 이름이 있는 주소입니다(예: https://xxx.example.com/path、app.example.com）→는 **전체 호스트 이름**, kind=subdomain, value=전체 호스트 이름을 사용합니다.
+  예: 대상 https://a1b2c3.lab.example.net/path → kind=subdomain, value=a1b2c3.lab.example.net (**example.net 아님**).
+  하위 도메인이 포함된 호스트 이름을 루트 도메인 이름으로 단축하는 것은 엄격히 금지됩니다**. xxx.example.com가 표시될 때 전체 example.com를 등록하면 사용자의 대상 이상으로 범위가 확장되어 최소 범위 원칙을 위반하게 됩니다.
+- 사용자가 **기본 루트 도메인 이름**을 제공하고 하위 도메인을 포함하지 않는** 경우에만(예: example.com 직접 작성), 또는 명시적으로 ＂전체 사이트/모든 하위 도메인/전체 도메인 이름＂이라고 말한 경우에만 kind=root_domain, value=example.com를 사용하세요 →.
+- 순수 IP 또는 네트워크 세그먼트 → kind=ip / cidr, value=IP 또는 CIDR.
+- 회사 범위(company)를 등록하지 마십시오** - 태스크가 방금 생성되었으며 회사는 일반적으로 자산 시스템에 아직 존재하지 않으므로 등록할 수 없으며 회사 수준 범위는 후속 plan 단계에서 처리됩니다.
+기타 규칙:
+- **에 명확히 기재된 ** 대상/설명의 범위만 등록합니다. 언급되지 않은 도메인 이름/IP를 발명하거나 추론하는 것은 엄격히 금지됩니다.
+- reason 감사를 용이하게 하기 위한 근거가 되는 문장을 간략하게 기술합니다.
+- **대상/설명에 명시적인 자산 범위 없이 add_task_scope를 호출하지 마세요**.
+먼저 add_task_scope를 사용하여 범위(있는 경우)를 등록한 다음 set_goals를 호출하여 대상을 제출합니다.`
 
 // GoalSpec is one decomposed objective.
 type GoalSpec struct {
@@ -82,7 +82,7 @@ type GoalSpec struct {
 // shares the rate limiter, gets recorded by llmrec, and participates in LLM
 // failover instead of quietly bypassing all three.
 //
-// desc is the task's free-text description (背景：靶标范围/flag 数量/交战说明等).
+// desc is the task's free-text description (배경: 목표 범위/flag 수량/교전 설명 등).
 // It is fed alongside the goal so the decomposer no longer splits blind — the
 // prompt still forbids inventing anything the two texts don't state.
 //
@@ -111,12 +111,12 @@ func DecomposeGoalsWithProvider(ctx context.Context, prov llm.Provider, dataDir,
 	if prov == nil {
 		return nil
 	}
-	// 目标拆解是一次性调用：不挂 transcript store，所以 agentcore 不会往 ctx 上挂
-	// session id（它只在有 writer 时才挂，见 agentcore.Prompt）。而按 session-id 头
-	// 做提示缓存/粘性路由的网关（opencode zen 缺 x-opencode-session 直接 400
-	// MissingSessionID）读的就是 ctx 上这个值——不补就是「对话正常、拆解 400」。
-	// 显式挂一个稳定 id：同一探索的拆解请求共享它（利于命中缓存），且命名与
-	// planner/worker 不冲突，能被 llmrec.parseSession 正确归因。
+	// 대상 분해는 일회성 호출입니다. transcript는 store에 연결되지 않으므로 agentcore는 ctx에 연결되지 않습니다.
+	// session id(writer가 있는 경우에만 정지됩니다. agentcore.Prompt 참조) 그리고 session-id 헤더를 누르세요.
+	// 프롬프트 캐싱/고정 라우팅을 위한 게이트웨이(opencode zen 누락 x-opencode-session 다이렉트 400
+	// MissingSessionID)는 ctx의 값을 읽습니다. 추가되지 않은 경우 "정상 대화, 분해 400"을 의미합니다.
+	// 안정적인 id를 명시적으로 마운트합니다. 동일한 탐색의 디스어셈블리 요청은 이를 공유하며(캐시 히트에 도움이 됨) 이름은 다음과 같습니다.
+	// planner/worker는 충돌하지 않으며 llmrec.parseSession에 올바르게 귀속될 수 있습니다.
 	if ts != nil {
 		ctx = transcript.WithSessionID(ctx, fmt.Sprintf("exp%d-goals", ts.ID()))
 	}
@@ -128,8 +128,8 @@ func DecomposeGoalsWithProvider(ctx context.Context, prov llm.Provider, dataDir,
 	// {{.EngagementDescription}} template var — else a prompt that references the var
 	// would inject the description twice. System prompt stays pure static instructions.
 	sys := renderSystem("goals", goalsDefaultTmpl, GoalsVars{DataDir: dataDir, Now: nowStr()})
-	// set_constraints 始终可用(不依赖 asset store):正文已含「先抽操作约束再拆目标」这步
-	// (可在 agent 编辑页改措辞),这里只需接上工具。
+	// set_constraints는 항상 사용 가능합니다(asset store에 의존하지 않음). 텍스트에는 이미 "먼저 작업 제약 조건을 추출한 다음 대상을 분할합니다" 단계가 포함되어 있습니다.
+	// (agent 편집 페이지에서 문구를 변경할 수 있습니다.) 여기에 도구를 연결하기만 하면 됩니다.
 	tools := []actool.CoreTool{tsx.setGoals(), tsx.setConstraints()}
 	// Wire add_task_scope only when we have a real asset store + task to write to.
 	// The scope-extraction tail is appended in lockstep so the prompt never asks for
@@ -138,9 +138,9 @@ func DecomposeGoalsWithProvider(ctx context.Context, prov llm.Provider, dataDir,
 		tools = append(tools, tsx.addTaskScope())
 		sys += goalsScopeTail
 	}
-	userMsg := "任务目标：\n" + goalText
+	userMsg := "임무 대상: ​​\n" + goalText
 	if d := strings.TrimSpace(desc); d != "" {
-		userMsg += "\n\n任务描述（背景信息，可能含靶标范围/flag 数量/交战说明；仅供参考，不要臆造其中未提及的内容）：\n" + d
+		userMsg += "\n\n 임무 설명(배경 정보, 목표 범위/flag 수량/교전 설명이 포함될 수 있습니다. 참고용으로 언급되지 않은 내용은 추론하지 마세요): \n" + d
 	}
 	// Use captureRun so every LLM step is emitted as an activity record (visible in
 	// the plan tab under the round-0 marker). Falls back gracefully when emit is nil.
@@ -156,10 +156,10 @@ func DecomposeGoalsWithProvider(ctx context.Context, prov llm.Provider, dataDir,
 		Tools:                  tools,
 		PermissionMode:         acperm.ModeBypass,
 		DisableBackgroundTasks: true,
-		// 3 步(抽约束 → 登记范围 → 拆目标)各需一次工具调用,给足回合避免收尾前漏调 set_goals。
+		// 3단계(제약조건 추출 → 레지스터 범위 → 대상 분할) 각각에는 하나의 도구 호출이 필요하며, 종료 전에 set_goals에 대한 조정 누락을 방지할 수 있는 충분한 라운드를 제공합니다.
 		MaxTurns:     8,
-		NonStreaming: nonStreaming, // 该 profile 选非流式时走 Provider.Complete
-		MaxTokens:    maxTokens,    // 0 = 不发上限,由服务端默认值决定
+		NonStreaming: nonStreaming, // profile는 Provider.Complete를 걸을 때 비스트리밍을 선택합니다.
+		MaxTokens:    maxTokens,    // 0 = 서버의 기본값에 의해 결정된 상한값을 보내지 않음
 	}, userMsg, captureEmit)
 	// set_goals persisted the goals directly; read them back so the caller sees what
 	// was written (empty slice ⇒ the LLM produced nothing ⇒ caller falls back).

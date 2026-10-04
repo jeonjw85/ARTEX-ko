@@ -10,11 +10,11 @@ import (
 	"github.com/Autumn-27/norma/llm"
 )
 
-// LLM 轮询(故障转移)的服务端接线。设计见 docs/LLM轮询设计.md：
-//   - 全局激活配置这条路径(agent 未绑定、任务未 pin)才轮询;
-//   - 绑定/pin 的路径默认独占该配置,失败即失败(可由 llm_pool_bind_fallback 打开兜底);
-//   - 链序 = 激活配置 → 其余按 priority DESC,排除 pool_exclude 的;
-//   - 熔断状态进程级共享(s.llmHealth),重建 pool 不清空。
+// LLM 폴링(장애 조치) 서버 배선. 디자인에 대해서는 docs/LLM 폴링 디자인을 참조하세요.md:
+//   - 폴링하기 전에 이 경로(agent가 바인딩되지 않고 작업이 pin가 아님)를 전역적으로 활성화하고 구성합니다.
+//   - /pin에 바인딩된 경로는 기본적으로 이 구성을 독점적으로 차지합니다. 실패하면 실패합니다(llm_pool_bind_fallback로 열 수 있음).
+//   - 체인 순서 = 구성 활성화 → pool_exclude를 제외한 나머지는 priority DESC입니다.
+//   - 퓨즈 상태에서 프로세스 수준 공유(s.llmHealth), pool 재구축이 지워지지 않습니다.
 
 // newLLMHealthRegistry builds the process-wide circuit-breaker registry, mirroring
 // state into PG so a cooling-off window survives a restart. Writes are async and
@@ -31,7 +31,7 @@ func newLLMHealthRegistry(pg *db.DB) *llmpool.Registry {
 		}
 		go func() {
 			if err := pg.SaveLLMHealth(h); err != nil {
-				log.Printf("[llmpool] 熔断状态落库失败: %v", err)
+				log.Printf("[llmpool] 회로 차단기 상태에서 라이브러리를 삭제하지 못했습니다.: %v", err)
 			}
 		}()
 	}
@@ -48,7 +48,7 @@ func newLLMHealthRegistry(pg *db.DB) *llmpool.Registry {
 				st.OpenUntil = *h.OpenUntil
 			}
 			reg.Restore(h.ProfileID, st)
-			log.Printf("[llmpool] 恢复熔断状态: 配置 #%d 冷却至 %s", h.ProfileID, st.OpenUntil.Format(time.RFC3339))
+			log.Printf("[llmpool] 회로 차단기 상태 복원: 설정 #%d 쿨하게 %s", h.ProfileID, st.OpenUntil.Format(time.RFC3339))
 		}
 	}
 	return reg
@@ -83,7 +83,7 @@ func (s *Server) poolChain(headID int64, headProv llm.Provider, headCfg agent.Co
 	}
 	profs, err := s.m.pg.PoolProfiles()
 	if err != nil {
-		log.Printf("[llmpool] 读取轮询链失败: %v", err)
+		log.Printf("[llmpool] 폴링 체인을 읽지 못했습니다.: %v", err)
 		return nil
 	}
 	var head *db.LLMProfile
@@ -136,7 +136,7 @@ func (s *Server) poolForActive(activeID int64, prov llm.Provider, cfg agent.Conf
 	for _, m := range pool.Members() {
 		names = append(names, m.Name+"/"+m.Model)
 	}
-	log.Printf("[llmpool] LLM 轮询已启用，链路(%d): %v", len(names), names)
+	log.Printf("[llmpool] LLM 폴링이 활성화되었습니다. 링크(%d): %v", len(names), names)
 	return pool
 }
 

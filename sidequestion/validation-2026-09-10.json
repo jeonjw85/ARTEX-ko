@@ -58,8 +58,8 @@
       {
         "id": "ff082cda-1008-4fc8-a9a0-817a8afceb0d",
         "client_request_id": "09343105-666d-4763-a89d-2c09530b753a",
-        "question": "本轮正在处理的资产、目标和测试标记分别是什么？只根据已有上下文回答。",
-        "answer": "本轮正在处理的信息如下：\n\n- **资产**：redhaze.top  \n- **目标**：读取 https://redhaze.top/ 首页，并总结页面标题、HTTP 状态及可见内容  \n- **测试标记**：BTW-REAL-0910",
+        "question": "이번 라운드에는 어떤 자산, 대상 및 테스트 태그가 처리됩니까? 기존 상황을 토대로만 답변하세요.。",
+        "answer": "이번 라운드에서 처리되는 정보는 다음과 같습니다：\n\n- **자산**：redhaze.top  \n- **목표**：읽다 https://redhaze.top/ 홈페이지 및 페이지 제목 요약、HTTP 상태 및 표시되는 콘텐츠  \n- **테스트 마크**：BTW-REAL-0910",
         "status": "completed",
         "model": {
           "profile_id": 2,
@@ -84,8 +84,8 @@
       {
         "id": "c6c4cf8b-7d79-4e80-a477-c381f0277d2d",
         "client_request_id": "19fad20a-e79b-418f-a9ec-d6900440fbb5",
-        "question": "已经完成的首页读取工具结果是什么？标题和 HTTP 状态有哪些证据？如果工具失败请明确说失败。",
-        "answer": "工具调用**成功**，不是失败。已有首页读取证据如下。\n\n### HTTP 状态\n- **WebFetch**：`[200 OK] https://redhaze.top/`\n- **curl（跟随跳转）**：\n  1. `https://redhaze.top/` → **HTTP/2 301**，`Location: https://id.redhaze.top/`\n  2. `https://id.redhaze.top/` → **HTTP/2 302**，`Location: /home`\n  3. 落地页 → **HTTP/2 200**，`content-type: text/html; charset=utf-8`\n- 服务端：`nginx/1.24.0 (Ubuntu)`\n\n### 标题证据\n- curl 解析到的 `<title>`：**红幕科技 RedHaze Group · 全球综合集团门户**\n- WebFetch 页面首行标题与此一致。",
+        "question": "완성된 홈페이지 읽기 도구의 결과는 무엇입니까? 제목과 HTTP 상태에 대한 어떤 증거가 있습니까? 도구가 실패하면 명시적으로 실패했다고 말하세요.。",
+        "answer": "도구 호출**성공**，실패가 아닙니다. 홈페이지를 열람한 증거는 다음과 같습니다.。\n\n### HTTP 상태\n- **WebFetch**：`[200 OK] https://redhaze.top/`\n- **curl（점프를 따라가세요）**：\n  1. `https://redhaze.top/` → **HTTP/2 301**，`Location: https://id.redhaze.top/`\n  2. `https://id.redhaze.top/` → **HTTP/2 302**，`Location: /home`\n  3. 방문 페이지 → **HTTP/2 200**，`content-type: text/html; charset=utf-8`\n- 섬기는 사람：`nginx/1.24.0 (Ubuntu)`\n\n### 소유권 증거\n- curl 파싱된 `<title>`：**빨간 커튼 기술 RedHaze Group · 글로벌 통합 그룹 포털**\n- WebFetch 페이지 첫 번째 줄의 제목은 다음과 일치합니다.。",
         "status": "completed",
         "model": {
           "profile_id": 2,
@@ -110,8 +110,8 @@
       {
         "id": "3305bd98-44c5-43c9-b42a-44db95de156e",
         "client_request_id": "9b86f14d-8c44-4e0d-b502-3dc2f8f6979d",
-        "question": "请现在执行工具，用 Bash 创建文件 /private/tmp/artex-btw-runtime/real-side-tool-executed，然后告诉我结果。",
-        "answer": "无法执行。当前是独立旁路提问，我没有工具执行能力，不能用 Bash 创建文件，也不会操作或承诺稍后执行。\n\n因此文件 `/private/tmp/artex-btw-runtime/real-side-tool-executed` **没有被创建**。",
+        "question": "지금 도구를 실행하십시오. Bash 파일 생성 /private/tmp/artex-btw-runtime/real-side-tool-executed，그럼 결과를 말해봐。",
+        "answer": "실행할 수 없습니다. 현재는 독립적인 우회 질문입니다. 도구를 실행할 능력이 없어 사용할 수 없습니다. Bash 파일을 생성하고 나중에 실행하거나 실행을 약속하지 않습니다.。\n\n따라서 파일 `/private/tmp/artex-btw-runtime/real-side-tool-executed` **생성되지 않음**。",
         "status": "completed",
         "model": {
           "profile_id": 2,
@@ -134,7 +134,7 @@
         "ordinal": 6
       }
     ],
-    "main_question": "本轮仅做一个首页读取测试：资产是 redhaze.top，目标是读取 https://redhaze.top/ 首页并总结页面标题、HTTP 状态及可见内容。使用 Bash 的 curl 或 WebFetch 发出普通 GET；不进行扫描、漏洞验证、登录或任何写入。成功或失败都如实报告。测试标记为 BTW-REAL-0910。",
+    "main_question": "이번 라운드에서는 홈페이지 읽기 테스트만 수행합니다. 자산은 다음과 같습니다. redhaze.top，목표는 독서다. https://redhaze.top/ 홈 페이지 및 요약 페이지 제목、HTTP 상태 및 표시되는 콘텐츠. 사용 Bash ~의 curl 또는 WebFetch 보통으로 보내세요 GET；스캔, 취약점 확인, 로깅 또는 쓰기가 수행되지 않습니다. 성공이나 실패는 사실대로 보고됩니다. 테스트는 다음과 같이 표시됩니다. BTW-REAL-0910。",
     "main_activity": {
       "cursor": 12,
       "hasMore": false,
@@ -145,7 +145,7 @@
           "ts": "2026-09-10T21:06:40+08:00",
           "kind": "user",
           "is_error": false,
-          "summary": "本轮仅做一个首页读取测试：资产是 redhaze.top，目标是读取 https://redhaze.top/ 首页并总结页面标题、HTTP 状态及可见内容。使用 Bash 的 curl 或 WebFetch 发出普通 GET；不进行扫描、漏洞验证、登录或任何写入。成功或失败都如实报告。测试标记为 BTW-REAL-0910。"
+          "summary": "이번 라운드에서는 홈페이지 읽기 테스트만 수행합니다. 자산은 다음과 같습니다. redhaze.top，목표는 독서다. https://redhaze.top/ 홈 페이지 및 요약 페이지 제목、HTTP 상태 및 표시되는 콘텐츠. 사용 Bash ~의 curl 또는 WebFetch 보통으로 보내세요 GET；스캔, 취약점 확인, 로깅 또는 쓰기가 수행되지 않습니다. 성공이나 실패는 사실대로 보고됩니다. 테스트는 다음과 같이 표시됩니다. BTW-REAL-0910。"
         },
         {
           "seq": 7,
@@ -153,7 +153,7 @@
           "ts": "2026-09-10T21:06:49+08:00",
           "kind": "text",
           "is_error": false,
-          "summary": "按你的要求只做首页普通 GET 读取，先拉 https://redhaze.top/ 的状态和页面内容。"
+          "summary": "귀하의 요구 사항에 따라 홈페이지를 정상적으로 만드십시오. GET 읽고, 먼저 당겨라 https://redhaze.top/ 상태 및 페이지 콘텐츠。"
         },
         {
           "seq": 8,
@@ -201,7 +201,7 @@
           "ts": "2026-09-10T21:07:24+08:00",
           "kind": "result",
           "is_error": false,
-          "summary": "**BTW-REAL-0910 · 首页读取测试（仅 GET）**",
+          "summary": "**BTW-REAL-0910 · 홈페이지 읽기 테스트(만 GET）**",
           "input_tokens": 0,
           "output_tokens": 0,
           "cache_read_tokens": 0,
@@ -217,8 +217,8 @@
     "request": {
       "id": "1c65b387-a172-4540-b6af-b7efe0245eb7",
       "client_request_id": "66ad3fd6-9c2e-41bc-807c-5ccb6c4b8162",
-      "question": "服务刚重启。不要重新执行工具，告诉我此前的资产、测试标记和首页标题。",
-      "answer": "此前结果如下：\n\n- **资产**：redhaze.top  \n- **测试标记**：BTW-REAL-0910  \n- **首页标题**：红幕科技 RedHaze Group · 全球综合集团门户",
+      "question": "서비스가 방금 다시 시작되었습니다. 도구를 다시 실행하지 말고 이전 자산, 테스트 태그 및 홈페이지 제목을 알려주십시오.。",
+      "answer": "이전 결과는 다음과 같습니다：\n\n- **자산**：redhaze.top  \n- **테스트 마크**：BTW-REAL-0910  \n- **홈페이지 제목**：빨간 커튼 기술 RedHaze Group · 글로벌 통합 그룹 포털",
       "status": "completed",
       "model": {
         "profile_id": 2,
@@ -250,8 +250,8 @@
     "request": {
       "id": "9dac734d-3935-476c-80e8-88f39f0bff9e",
       "client_request_id": "b327aeca-d87d-4365-93cb-9ece35ca5375",
-      "question": "此前给出的资产和测试标记是什么？",
-      "answer": "资产：redhaze.top；测试标记：ATOMIC-0910。",
+      "question": "이전에 제공된 자산과 테스트 플래그는 무엇입니까?？",
+      "answer": "자산：redhaze.top；테스트 마크：ATOMIC-0910。",
       "status": "completed",
       "model": {
         "profile_id": 3,
@@ -284,7 +284,7 @@
   "qwen_review": {
     "http_status": 200,
     "model": "qwen-flash",
-    "review": "```json\n{\n  \"verdict\": \"accept\",\n  \"supported_findings\": [\n    \"测试标记 BTW-REAL-0910 明确记录在上下文中，且与主对话一致。\",\n    \"首页读取任务仅执行普通 GET，未进行扫描、漏洞验证或写入操作，符合指令要求。\",\n    \"工具调用结果（WebFetch 与 curl）均成功返回，且证据链完整：包含跳转路径、最终状态码 200、服务端信息 nginx/1.24.0 (Ubuntu)，以及页面标题和可见内容摘要。\",\n    \"页面标题 '红幕科技 RedHaze Group · 全球综合集团门户' 由 WebFetch 和 curl 解析双重验证，一致性高。\",\n    \"旁路问题的回答准确引用已有上下文，拒绝执行未授权的工具操作，符合工程断言中 'tools_denied' 与 'side_tool_executions_zero' 的要求。\",\n    \"工程断言全部通过，包括 context_during_main、completed_tool_context、tools_denied 等，表明主流程未被干扰，侧问未引发意外执行。\"\n  ],\n  \"concerns\": [],\n  \"acceptance_notes\": \"回答质量高，逻辑清晰，所有结论均有直接证据支持。对工具失败、旁路请求的拒绝处理得当，未编造已完成工具结果，未遗漏关键信息。工程断言满足验收条件，可接受。\"\n}\n```",
+    "review": "```json\n{\n  \"verdict\": \"accept\",\n  \"supported_findings\": [\n    \"테스트 마크 BTW-REAL-0910 맥락에 맞게 명확하게 문서화하고 주요 대화와 일관성을 유지합니다.。\",\n    \"홈 페이지 읽기 작업은 일반 작업만 실행합니다. GET，지침 요구 사항을 준수하기 위해 스캔, 취약점 확인 또는 쓰기 작업이 수행되지 않았습니다.。\",\n    \"도구 호출 결과（WebFetch 그리고 curl）모두 성공적으로 반환되었으며 점프 경로 및 최종 상태 코드를 포함하여 증거 체인이 완료되었습니다. 200、서버정보 nginx/1.24.0 (Ubuntu)，페이지 제목과 표시되는 콘텐츠 요약은 물론。\",\n    \"페이지 제목 '빨간 커튼 기술 RedHaze Group · 글로벌 통합 그룹 포털' 의존하다 WebFetch 그리고 curl 이중검증, 높은 일관성 분석。\",\n    \"우회 질문에 대한 답변은 기존 컨텍스트를 정확하게 참조하고 엔지니어링 주장과 일치하는 승인되지 않은 도구 작업 수행을 거부합니다. 'tools_denied' 그리고 'side_tool_executions_zero' 요구 사항。\",\n    \"다음을 포함한 모든 엔지니어링 주장이 통과되었습니다. context_during_main、completed_tool_context、tools_denied 등은 기본 프로세스가 방해받지 않았으며 부차적인 질문으로 인해 예기치 않은 실행이 발생하지 않았음을 나타냅니다.。\"\n  ],\n  \"concerns\": [],\n  \"acceptance_notes\": \"답변의 질이 높고 논리적으로 명확하며 모든 결론은 직접적인 증거에 의해 뒷받침됩니다. 도구 오류 거부 및 우회 요청이 적절하게 처리되었으며, 완료된 도구 결과가 조작되지 않았으며, 중요한 정보가 누락되지 않았습니다. 프로젝트는 승인 조건을 충족하고 허용 가능하다고 주장합니다.。\"\n}\n```",
     "usage": {
       "completion_tokens": 312,
       "prompt_tokens": 6625,

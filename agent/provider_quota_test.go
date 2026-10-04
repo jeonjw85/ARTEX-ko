@@ -25,6 +25,7 @@ func TestIsQuotaExhaustedMessage(t *testing.T) {
 		`billing_not_active`,
 		`credit balance is too low`,
 		`账户余额不足，请充值`,
+		`账户额度已用尽`,
 	}
 	for _, message := range positive {
 		if !IsQuotaExhaustedMessage(message) {

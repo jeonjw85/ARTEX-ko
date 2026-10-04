@@ -3,29 +3,29 @@ package notify
 import "testing"
 
 func TestParseFilterMalformedFallsBackToMatchAll(t *testing.T) {
-	// 畸形 JSON、空输入、类型不对的字段——全部必须退化为零值 Filter，
-	// 即「不过滤」。这条不变量是「宁可多推不可漏推」的落点：
-	// 一旦这里改成报错或半解析，用户配错一个字符就会静默丢掉所有高危通知。
+	// 잘못된 JSON, 빈 입력, 잘못된 유형의 필드 - 모두 0 값 Filter로 변질되어야 합니다.
+	// 그것은 "필터링 없음"입니다. 이 불변성은 "나는 놓치는 것보다 더 많은 것을 밀고 싶다"의 출발점입니다.
+	// 이것이 오류 보고 또는 세미 파싱으로 변경되면 사용자가 문자와 일치하지 않으면 모든 고위험 알림이 자동으로 삭제됩니다.
 	cases := []struct {
 		name string
 		raw  string
 	}{
-		{"空输入", ""},
-		{"非法 JSON", `{not json`},
-		{"截断的 JSON", `{"min_severity":`},
-		{"类型不匹配", `{"min_severity": 123, "task_ids": "abc"}`},
-		{"顶层是数组", `[1,2,3]`},
+		{"빈 입력", ""},
+		{"불법적인 JSON", `{not json`},
+		{"잘린 JSON", `{"min_severity":`},
+		{"유형 불일치", `{"min_severity": 123, "task_ids": "abc"}`},
+		{"최상위 수준은 배열입니다.", `[1,2,3]`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := ParseFilter([]byte(tc.raw))
 			if f.MinSeverity != "" || len(f.TaskIDs) != 0 || len(f.AssetIDs) != 0 {
-				t.Fatalf("畸形配置应退化为零值 Filter，得到 %+v", f)
+				t.Fatalf("잘못된 구성은 0 값 Filter로 변질되어 %+v가 발생합니다.", f)
 			}
-			// 零值 Filter 必须命中任意事件。
+			// 0 값 Filter는 모든 이벤트에 도달해야 합니다.
 			ev := Snapshot{Kind: EventFindingCreated, Severity: "low", VulnClass: "XSS"}
 			if !Match(f, ev) {
-				t.Fatal("零值 Filter 应命中所有事件")
+				t.Fatal("0 값 Filter는 모든 이벤트에 도달해야 합니다.")
 			}
 		})
 	}
@@ -48,7 +48,7 @@ func TestMatchSeverityThreshold(t *testing.T) {
 		{"high", "low", false},
 		{"critical", "high", false},
 		{"critical", "critical", true},
-		// 未知级别序数为 0，应被任何非空门槛挡住（存疑时不推）。
+		// 알 수 없는 수준 서수는 0이며 비어 있지 않은 임계값에 의해 차단되어야 합니다(의심스러운 경우에는 푸시하지 마세요).
 		{"low", "", false},
 		{"low", "unknown", false},
 		{"", "", true},
@@ -56,7 +56,7 @@ func TestMatchSeverityThreshold(t *testing.T) {
 	for _, tc := range cases {
 		got := Match(Filter{MinSeverity: tc.min}, ev(tc.sev))
 		if got != tc.expect {
-			t.Errorf("min=%q sev=%q: 期望 %v 得到 %v", tc.min, tc.sev, tc.expect, got)
+			t.Errorf("min=%q sev=%q: %v가 %v를 얻을 것으로 예상합니다.", tc.min, tc.sev, tc.expect, got)
 		}
 	}
 }
@@ -67,26 +67,26 @@ func TestMatchScopeRestrictions(t *testing.T) {
 		Severity:  "high",
 		TaskID:    7,
 		AssetIDs:  []int64{10, 20},
-		VulnClass: "SQL注入",
+		VulnClass: "SQL 주입",
 	}
 	cases := []struct {
 		name   string
 		filter Filter
 		expect bool
 	}{
-		{"空范围=不限", Filter{}, true},
-		{"任务命中", Filter{TaskIDs: []int64{7}}, true},
-		{"任务未命中", Filter{TaskIDs: []int64{8}}, false},
-		{"任务多选含命中", Filter{TaskIDs: []int64{8, 7}}, true},
-		{"资产有交集", Filter{AssetIDs: []int64{20, 99}}, true},
-		{"资产无交集", Filter{AssetIDs: []int64{99}}, false},
-		{"任务与资产同时命中", Filter{TaskIDs: []int64{7}, AssetIDs: []int64{10}}, true},
-		{"任务命中但资产未命中", Filter{TaskIDs: []int64{7}, AssetIDs: []int64{99}}, false},
+		{"빈 범위 = 제한 없음", Filter{}, true},
+		{"미션 히트", Filter{TaskIDs: []int64{7}}, true},
+		{"임무 실패", Filter{TaskIDs: []int64{8}}, false},
+		{"히트를 포함한 다양한 작업 선택", Filter{TaskIDs: []int64{8, 7}}, true},
+		{"자산이 교차합니다.", Filter{AssetIDs: []int64{20, 99}}, true},
+		{"자산 교차 없음", Filter{AssetIDs: []int64{99}}, false},
+		{"작업과 자산이 동시에 적중", Filter{TaskIDs: []int64{7}, AssetIDs: []int64{10}}, true},
+		{"작업이 적중했지만 자산이 누락되었습니다.", Filter{TaskIDs: []int64{7}, AssetIDs: []int64{99}}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := Match(tc.filter, ev); got != tc.expect {
-				t.Errorf("期望 %v 得到 %v", tc.expect, got)
+				t.Errorf("%v가 %v를 얻을 것으로 예상", tc.expect, got)
 			}
 		})
 	}
@@ -102,25 +102,25 @@ func TestMatchVulnClassKeywords(t *testing.T) {
 		class  string
 		expect bool
 	}{
-		{"include 为空=全收", Filter{}, "任意类型", true},
-		{"include 命中", Filter{VulnClassInclude: []string{"SQL"}}, "SQL注入", true},
-		{"include 未命中", Filter{VulnClassInclude: []string{"命令执行"}}, "SQL注入", false},
-		{"include 多词任一命中", Filter{VulnClassInclude: []string{"命令执行", "SQL"}}, "SQL注入", true},
-		{"大小写不敏感", Filter{VulnClassInclude: []string{"sql"}}, "SQL注入", true},
-		{"exclude 命中即排除", Filter{VulnClassExclude: []string{"信息泄露"}}, "信息泄露", false},
-		{"exclude 未命中则放行", Filter{VulnClassExclude: []string{"信息泄露"}}, "SQL注入", true},
-		// 排除优先于包含：同时命中时应当出局。
-		{"排除优先于包含", Filter{
+		{"include가 비어 있음=모두 수락", Filter{}, "모든 유형", true},
+		{"include 히트", Filter{VulnClassInclude: []string{"SQL"}}, "SQL 주입", true},
+		{"include 미스", Filter{VulnClassInclude: []string{"명령 실행"}}, "SQL 주입", false},
+		{"include 여러 단어 중 하나가 적중됩니다.", Filter{VulnClassInclude: []string{"명령 실행", "SQL"}}, "SQL 주입", true},
+		{"대소문자를 구분하지 않음", Filter{VulnClassInclude: []string{"sql"}}, "SQL 주입", true},
+		{"exclude 적중 시 제외", Filter{VulnClassExclude: []string{"정보 유출"}}, "정보 유출", false},
+		{"exclude 맞지 않으면 패스", Filter{VulnClassExclude: []string{"정보 유출"}}, "SQL 주입", true},
+		// 제외가 포함보다 우선합니다. 동시에 적중하면 아웃이 발생합니다.
+		{"제외가 포함보다 우선합니다.", Filter{
 			VulnClassInclude: []string{"SQL"},
-			VulnClassExclude: []string{"注入"},
-		}, "SQL注入", false},
-		// 纯空白关键词应被忽略，否则会退化成「匹配所有含空格的字符串」。
-		{"空白关键词被忽略", Filter{VulnClassInclude: []string{"", "  "}}, "SQL注入", false},
+			VulnClassExclude: []string{"주입"},
+		}, "SQL 주입", false},
+		// 순수한 공백 키워드는 무시해야 합니다. 그렇지 않으면 "공백을 포함하는 모든 문자열과 일치"로 변질됩니다.
+		{"빈 키워드는 무시됩니다.", Filter{VulnClassInclude: []string{"", "  "}}, "SQL 주입", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := Match(tc.filter, ev(tc.class)); got != tc.expect {
-				t.Errorf("期望 %v 得到 %v", tc.expect, got)
+				t.Errorf("%v가 %v를 얻을 것으로 예상", tc.expect, got)
 			}
 		})
 	}
@@ -128,16 +128,16 @@ func TestMatchVulnClassKeywords(t *testing.T) {
 
 func TestMatchStatusChangeRequiresOptIn(t *testing.T) {
 	ev := Snapshot{Kind: EventFindingStatusChanged, Severity: "critical", FromStatus: "pending", ToStatus: "fixed"}
-	// 默认关：绝大多数人说的「推送漏洞」指发现新漏洞，不是状态流水账。
+	// 기본값 꺼짐: 대부분의 사람들이 "푸시 취약점"이라고 부르는 것은 상태 계정이 아닌 새로운 취약점의 발견을 의미합니다.
 	if Match(Filter{MinSeverity: "low"}, ev) {
-		t.Fatal("状态变更事件在未开启时应被跳过")
+		t.Fatal("활성화되지 않은 경우 상태 변경 이벤트를 건너뛰어야 합니다.")
 	}
 	if !Match(Filter{OnStatusChange: true}, ev) {
-		t.Fatal("开启 on_status_change 后状态变更事件应命中")
+		t.Fatal("on_status_change를 켠 후 상태 변경 이벤트가 발생해야 합니다.")
 	}
-	// 创建事件不受 on_status_change 影响。
+	// 생성 이벤트는 on_status_change의 영향을 받지 않습니다.
 	created := Snapshot{Kind: EventFindingCreated, Severity: "critical"}
 	if !Match(Filter{MinSeverity: "low"}, created) {
-		t.Fatal("创建事件不应依赖 on_status_change")
+		t.Fatal("생성 이벤트는 on_status_change에 의존해서는 안 됩니다.")
 	}
 }

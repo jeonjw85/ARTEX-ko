@@ -11,7 +11,7 @@ export async function persistPreference(key: PreferenceKey, value: string) {
     case "none":
       return;
 
-    // 静态导出无 Node 服务端，server-cookie 退化为浏览器 cookie（写入语义等价）。
+    // 정적 내보내기를 위한 Node 서버가 없으며 server-cookie는 브라우저 cookie로 변질됩니다(의미론 작성은 동일함).
     case "server-cookie":
     case "client-cookie":
       setClientCookie(key, value);

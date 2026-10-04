@@ -30,19 +30,19 @@ import { cn } from "@/lib/utils";
 type ComposerLayout = "inline" | "stacked";
 
 const preparationLabels = {
-  preparing: "正在准备上下文…",
-  summarizing_history: "正在整理早期旁路问答…",
-  compressing_snapshot: "正在压缩旁路上下文副本…",
-  retrying: "模型上下文超限，正在缩减后重试…",
-  answering: "正在回答…",
+  preparing: "상황 준비 중…",
+  summarizing_history: "초기 우회 Q&A를 대조하는 중...",
+  compressing_snapshot: "컨텍스트 복사 우회 압축 중...",
+  retrying: "모델 컨텍스트가 초과되었습니다. 축소 후 다시 시도하세요...",
+  answering: "응답 중…",
 };
 
 export function SideQuestionButton({ side }: { side: SideQuestions }) {
   if (!side.enabled) return null;
   return (
-    <Button variant="outline" size="sm" onClick={() => side.setOpen(true)} title="/btw 旁路提问">
+    <Button variant="outline" size="sm" onClick={() => side.setOpen(true)} title="/btw 우회 질문">
       <MessageCircleQuestionIcon data-icon="inline-start" />
-      旁路提问
+      질문 우회
     </Button>
   );
 }
@@ -65,13 +65,13 @@ function SidePanel({
   useEffect(() => {
     if (pinned.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
   }, [tail?.answer, tail?.id]);
-  const status = { running: "回答中", completed: "已完成", failed: "失败", cancelled: "已停止", interrupted: "已中断" };
+  const status = { running: "응답", completed: "완료됨", failed: "실패", cancelled: "중지됨", interrupted: "중단된" };
   return (
-    <section className="flex h-full min-h-0 flex-col bg-background" aria-label="旁路提问面板">
+    <section className="flex h-full min-h-0 flex-col bg-background" aria-label="질문 패널 우회">
       <div className="flex items-center gap-2 border-b p-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium">
-            旁路提问 <span className="text-muted-foreground">/btw</span>
+            질문 우회 <span className="text-muted-foreground">/btw</span>
           </p>
           <p className="truncate text-muted-foreground text-xs">{label}</p>
         </div>
@@ -80,11 +80,11 @@ function SidePanel({
           size="icon-sm"
           onClick={() => setConfirm(true)}
           disabled={!side.items.length || side.busy}
-          aria-label="清空旁路历史"
+          aria-label="우회 기록 지우기"
         >
           <Trash2Icon />
         </Button>
-        <Button variant="ghost" size="icon-sm" onClick={() => side.setOpen(false)} aria-label="关闭旁路面板">
+        <Button variant="ghost" size="icon-sm" onClick={() => side.setOpen(false)} aria-label="우회 패널 닫기">
           <XIcon />
         </Button>
       </div>
@@ -92,10 +92,10 @@ function SidePanel({
         {side.snapshot ? (
           <>
             <p>{side.snapshot.model.model}</p>
-            <p>上下文更新于 {new Date(side.snapshot.captured_at).toLocaleString()}</p>
+            <p>컨텍스트 업데이트 날짜 {new Date(side.snapshot.captured_at).toLocaleString()}</p>
           </>
         ) : (
-          "主 Agent 首次运行后即可提问"
+          "Main Agent 처음 실행하신 후 질문을 하시면 됩니다."
         )}
       </div>
       <div
@@ -108,15 +108,15 @@ function SidePanel({
       >
         {side.nextCursor > 0 && (
           <Button variant="ghost" size="sm" onClick={() => void side.load(side.nextCursor)}>
-            加载更早的旁路问答
+            이전 우회 Q&A 로드
           </Button>
         )}
         {side.loading && <Skeleton className="h-16 w-full" />}
         {!side.loading && side.items.length === 0 && (
           <Empty>
             <EmptyHeader>
-              <EmptyTitle>随时问一个问题</EmptyTitle>
-              <EmptyDescription>根据当前 Agent 的上下文回答，主任务继续运行。</EmptyDescription>
+              <EmptyTitle>언제든지 질문해주세요</EmptyTitle>
+              <EmptyDescription>주 작업은 Agent의 현재 컨텍스트 응답에 따라 계속 실행됩니다.</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
@@ -128,14 +128,14 @@ function SidePanel({
                 <Badge variant="secondary">{status[item.status]}</Badge>
                 <span className="truncate">{item.model.model}</span>
                 <time dateTime={item.snapshot_at} title={new Date(item.snapshot_at).toLocaleString()}>
-                  上下文 {new Date(item.snapshot_at).toLocaleTimeString()}
+                  문맥 {new Date(item.snapshot_at).toLocaleTimeString()}
                 </time>
               </div>
               {item.context?.estimated_input_tokens != null && (
                 <p className="text-muted-foreground text-xs">
-                  最近 {item.context.recent_exchanges} 组问答原文
-                  {item.context.history_summarized && " · 含早期问答摘要"}
-                  {item.context.snapshot_summarized && " · 使用主上下文摘要"}
+                  최근의 {item.context.recent_exchanges} 그룹 Q&A 원문
+                  {item.context.history_summarized && " · 초기 Q&A 요약 포함"}
+                  {item.context.snapshot_summarized && " · 주요 컨텍스트 요약을 사용하세요."}
                 </p>
               )}
               {item.answer && <Markdown text={item.answer} />}
@@ -163,8 +163,8 @@ function SidePanel({
           <InputGroupTextarea
             rows={1}
             className={cn("overflow-y-auto", inlineComposer ? "max-h-40 min-h-0" : "max-h-36 min-h-9")}
-            aria-label="旁路问题"
-            placeholder="询问当前上下文…"
+            aria-label="우회 문제"
+            placeholder="현재 상황을 물어보세요…"
             value={side.draft}
             maxLength={4000}
             disabled={side.busy}
@@ -177,14 +177,14 @@ function SidePanel({
             }}
           />
           <InputGroupAddon align={inlineComposer ? "inline-end" : "block-end"}>
-            {!inlineComposer && <span className="text-muted-foreground text-xs">独立问答 · 无工具执行</span>}
+            {!inlineComposer && <span className="text-muted-foreground text-xs">독립적인 Q&A · 도구 없이 실행</span>}
             {side.running ? (
               <InputGroupButton
                 className="ml-auto"
                 variant="destructive"
                 size="icon-xs"
                 onClick={() => void side.stop()}
-                aria-label="停止旁路回答"
+                aria-label="우회 답장 중지"
               >
                 <SquareIcon />
               </InputGroupButton>
@@ -195,7 +195,7 @@ function SidePanel({
                 size="icon-xs"
                 onClick={() => void side.ask(side.draft)}
                 disabled={side.busy || !side.draft.trim() || !side.snapshot?.available}
-                aria-label="发送旁路问题"
+                aria-label="우회 질문 보내기"
               >
                 <ArrowUpIcon />
               </InputGroupButton>
@@ -204,19 +204,19 @@ function SidePanel({
         </InputGroup>
       </div>
       {inlineComposer && (
-        <div className="shrink-0 truncate px-3 pt-0.5 pb-1 text-muted-foreground text-xs">独立问答 · 无工具执行</div>
+        <div className="shrink-0 truncate px-3 pt-0.5 pb-1 text-muted-foreground text-xs">독립적인 Q&A · 도구 없이 실행</div>
       )}
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>清空旁路历史？</AlertDialogTitle>
+            <AlertDialogTitle>우회 기록을 삭제하시겠습니까?</AlertDialogTitle>
             <AlertDialogDescription>
-              删除当前 Agent 的旁路问答，并停止正在生成的旁路回答。主会话和上下文快照会保留。
+              현재 Agent의 우회 질문과 답변을 삭제하고 우회 답변 생성을 중지합니다. 기본 세션 및 컨텍스트 스냅샷은 유지됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void side.clear()}>清空历史</AlertDialogAction>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void side.clear()}>기록 지우기</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -254,8 +254,8 @@ export function SideQuestionWorkspace({
       <Drawer open={mobile && side.open && side.enabled} onOpenChange={side.setOpen}>
         <DrawerContent className="h-[85svh]">
           <DrawerHeader className="sr-only">
-            <DrawerTitle>旁路提问</DrawerTitle>
-            <DrawerDescription>{label} 的独立问答</DrawerDescription>
+            <DrawerTitle>질문 우회</DrawerTitle>
+            <DrawerDescription>{label} 독립적인 Q&A</DrawerDescription>
           </DrawerHeader>
           <SidePanel side={side} label={label} composerLayout={composerLayout} />
         </DrawerContent>

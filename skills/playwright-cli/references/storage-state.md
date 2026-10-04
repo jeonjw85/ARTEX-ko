@@ -1,12 +1,12 @@
-# Storage Management
+# 스토리지 관리
 
-Manage cookies, localStorage, sessionStorage, and browser storage state.
+쿠키, localStorage, sessionStorage 및 브라우저 저장 상태를 관리합니다.
 
-## Storage State
+## 보관상태
 
-Save and restore complete browser state including cookies and storage.
+쿠키 및 저장소를 포함한 전체 브라우저 상태를 저장하고 복원합니다.
 
-### Save Storage State
+### 저장 상태 저장
 
 ```bash
 # Save to auto-generated filename (storage-state-{timestamp}.json)
@@ -16,7 +16,7 @@ playwright-cli state-save
 playwright-cli state-save my-auth-state.json
 ```
 
-### Restore Storage State
+### 저장소 상태 복원
 
 ```bash
 # Load storage state from file
@@ -26,9 +26,9 @@ playwright-cli state-load my-auth-state.json
 playwright-cli open https://example.com
 ```
 
-### Storage State File Format
+### 스토리지 상태 파일 형식
 
-The saved file contains:
+저장된 파일에는 다음이 포함됩니다.
 
 ```json
 {
@@ -56,33 +56,33 @@ The saved file contains:
 }
 ```
 
-## Cookies
+## 쿠키
 
-### List All Cookies
+### 모든 쿠키 나열
 
 ```bash
 playwright-cli cookie-list
 ```
 
-### Filter Cookies by Domain
+### 도메인별로 쿠키 필터링
 
 ```bash
 playwright-cli cookie-list --domain=example.com
 ```
 
-### Filter Cookies by Path
+### 경로별로 쿠키 필터링
 
 ```bash
 playwright-cli cookie-list --path=/api
 ```
 
-### Get Specific Cookie
+### 특정 쿠키 가져오기
 
 ```bash
 playwright-cli cookie-get session_id
 ```
 
-### Set a Cookie
+### 쿠키 설정
 
 ```bash
 # Basic cookie
@@ -95,21 +95,21 @@ playwright-cli cookie-set session abc123 --domain=example.com --path=/ --httpOnl
 playwright-cli cookie-set remember_me token123 --expires=1893456000
 ```
 
-### Delete a Cookie
+### 쿠키 삭제
 
 ```bash
 playwright-cli cookie-delete session_id
 ```
 
-### Clear All Cookies
+### 모든 쿠키 지우기
 
 ```bash
 playwright-cli cookie-clear
 ```
 
-### Advanced: Multiple Cookies or Custom Options
+### 고급: 다중 쿠키 또는 사용자 정의 옵션
 
-For complex scenarios like adding multiple cookies at once, use `run-code`:
+한 번에 여러 쿠키를 추가하는 것과 같은 복잡한 시나리오의 경우 `run-code`를 사용하세요.
 
 ```bash
 playwright-cli run-code "async page => {
@@ -120,47 +120,47 @@ playwright-cli run-code "async page => {
 }"
 ```
 
-## Local Storage
+## 로컬 저장소
 
-### List All localStorage Items
+### 모든 localStorage 항목 나열
 
 ```bash
 playwright-cli localstorage-list
 ```
 
-### Get Single Value
+### 단일 값 가져오기
 
 ```bash
 playwright-cli localstorage-get token
 ```
 
-### Set Value
+### 값 설정
 
 ```bash
 playwright-cli localstorage-set theme dark
 ```
 
-### Set JSON Value
+### JSON 값 설정
 
 ```bash
 playwright-cli localstorage-set user_settings '{"theme":"dark","language":"en"}'
 ```
 
-### Delete Single Item
+### 단일 항목 삭제
 
 ```bash
 playwright-cli localstorage-delete token
 ```
 
-### Clear All localStorage
+### 모든 로컬 저장소 지우기
 
 ```bash
 playwright-cli localstorage-clear
 ```
 
-### Advanced: Multiple Operations
+### 고급: 다중 작업
 
-For complex scenarios like setting multiple values at once, use `run-code`:
+한 번에 여러 값을 설정하는 것과 같은 복잡한 시나리오의 경우 `run-code`를 사용하세요.
 
 ```bash
 playwright-cli run-code "async page => {
@@ -172,33 +172,33 @@ playwright-cli run-code "async page => {
 }"
 ```
 
-## Session Storage
+## 세션 저장
 
-### List All sessionStorage Items
+### 모든 sessionStorage 항목 나열
 
 ```bash
 playwright-cli sessionstorage-list
 ```
 
-### Get Single Value
+### 단일 값 가져오기
 
 ```bash
 playwright-cli sessionstorage-get form_data
 ```
 
-### Set Value
+### 값 설정
 
 ```bash
 playwright-cli sessionstorage-set step 3
 ```
 
-### Delete Single Item
+### 단일 항목 삭제
 
 ```bash
 playwright-cli sessionstorage-delete step
 ```
 
-### Clear sessionStorage
+### 세션 저장소 지우기
 
 ```bash
 playwright-cli sessionstorage-clear
@@ -206,7 +206,7 @@ playwright-cli sessionstorage-clear
 
 ## IndexedDB
 
-### List Databases
+### 데이터베이스 나열
 
 ```bash
 playwright-cli run-code "async page => {
@@ -217,7 +217,7 @@ playwright-cli run-code "async page => {
 }"
 ```
 
-### Delete Database
+### 데이터베이스 삭제
 
 ```bash
 playwright-cli run-code "async page => {
@@ -227,9 +227,9 @@ playwright-cli run-code "async page => {
 }"
 ```
 
-## Common Patterns
+## 일반적인 패턴
 
-### Authentication State Reuse
+### 인증 상태 재사용
 
 ```bash
 # Step 1: Login and save state
@@ -248,7 +248,7 @@ playwright-cli open https://app.example.com/dashboard
 # Already logged in!
 ```
 
-### Save and Restore Roundtrip
+### 왕복 저장 및 복원
 
 ```bash
 # Set up authentication state
@@ -266,10 +266,10 @@ playwright-cli open https://example.com
 # Cookies and localStorage are restored!
 ```
 
-## Security Notes
+## 보안 참고사항
 
-- Never commit storage state files containing auth tokens
-- Add `*.auth-state.json` to `.gitignore`
-- Delete state files after automation completes
-- Use environment variables for sensitive data
-- By default, sessions run in-memory mode which is safer for sensitive operations
+- 인증 토큰이 포함된 스토리지 상태 파일을 커밋하지 마세요.
+- `.gitignore`에 `*.auth-state.json` 추가
+- 자동화가 완료된 후 상태 파일 삭제
+- 민감한 데이터에 환경 변수 사용
+- 기본적으로 세션은 민감한 작업에 더 안전한 인메모리 모드로 실행됩니다.

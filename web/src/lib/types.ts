@@ -1,12 +1,12 @@
 // ARTEX domain model — types used across the UI.
-// Derived from the functional spec (section 7: 关键数据形状).
+// Derived from the functional spec (section 7: 키 데이터 형태).
 
 export type TaskStatus = "created" | "queued" | "running" | "paused" | "done" | "failed" | "timeout";
 export type EngineMode = "exploring" | "paused" | "stalled" | "idle";
 
 export interface Task {
   id: string;
-  name?: string; // 可选任务名称;空/缺省=未命名,展示时回退到描述
+  name?: string; // 선택적 작업 이름. 비어 있음/기본값 = 이름이 지정되지 않음, 표시 시 설명으로 대체
   category_id?: number;
   category_name?: string;
   pinned?: boolean;
@@ -23,7 +23,7 @@ export interface Task {
   queued?: boolean;
   active?: boolean;
   in_flight?: number;
-  findings?: { critical: number; high: number; medium: number; low: number }; // 已登记漏洞数(按严重度分档)
+  findings?: { critical: number; high: number; medium: number; low: number }; // 등록된 취약점 수(심각도별로 분류)
   last_activity?: string;
   stalled?: boolean;
   goals_total?: number;
@@ -38,7 +38,7 @@ export interface Task {
   source_task_ids?: string[]; // directly related tasks inherited as read-only context
   archive_blocked_by_task_id?: string; // live direct dependent that must be archived first
   company_ids?: number[]; // associated company scopes; current company assets join the task at creation
-  coverage_enabled?: boolean; // 资产覆盖度功能开关(创建时定,默认开)；false=不计算/不展示覆盖度
+  coverage_enabled?: boolean; // 자산 적용 범위 기능 스위치(생성 시 설정, 기본적으로 활성화됨) false=커버리지를 계산하지 않음/표시하지 않음
 }
 
 export interface TaskCategory {
@@ -54,8 +54,8 @@ export interface TaskTemplate {
   name: string;
   description: string;
   goal: string;
-  category_id?: number | null; // 预设分类；null/缺省=无
-  intercept_rules?: AssetInterceptRuleInput[]; // 预设的任务级拦截/允许规则
+  category_id?: number | null; // 기본 분류; null/ 기본값 = 없음
+  intercept_rules?: AssetInterceptRuleInput[]; // 사전 설정된 작업 수준 차단/허용 규칙
   created_at: string;
   updated_at: string;
 }
@@ -169,7 +169,7 @@ export interface AssetNode {
   name: string;
   key: string; // nkey
   value?: string;
-  company_id?: string; // 归属公司资产 id；空=未归属
+  company_id?: string; // 귀속된 회사 자산 id; 비어 있음 = 귀속되지 않음
   state: NodeState;
   confidence: number; // 0..1
   attrs?: Record<string, unknown>;
@@ -284,8 +284,8 @@ export interface TaskAssetScopeMutation {
 }
 
 // ---- Asset coverage graph (per task) ----
-// 力导向「资产覆盖图」的一个节点。key 唯一：资产="a:<id>"、公司="c:<id>"、
-// 无资产行的根域名="r:<domain>"。in_scope=false 的是仅用于连线的灰色上下文节点。
+// 강제로 지시되는「자산 커버리지 맵」노드。key 전용: 자산="a:<id>"、회사="c:<id>"、
+// 자산 행이 없는 루트 도메인 이름="r:<domain>"。in_scope=false 배선에만 사용되는 회색 컨텍스트 노드입니다.。
 export interface CoverageGraphNode {
   key: string;
   kind: "company" | "root_domain" | "subdomain" | "ip" | "service" | "app" | "endpoint";
@@ -315,7 +315,7 @@ export interface CoverageGraphData {
   edges: CoverageGraphEdge[];
 }
 
-// 某资产在本任务探索图里关联到的意图/事实/发现（覆盖图节点抽屉用）。
+// 이 작업 탐색 그래프의 자산과 관련된 의도/사실/발견입니다(오버레이 그래프 노드 서랍에 사용됨).
 export interface CoverageAssetRef {
   id: number;
   kind: string;
@@ -350,13 +350,13 @@ export interface WorkspaceFile {
   content?: string;
 }
 
-// 任务测试范围的一条（覆盖度分母 + 授权边界）。
+// 작업 테스트 범위(적용 범위 분모 + 권한 부여 경계)의 줄입니다.
 export interface TaskScopeRow {
   id: number;
   task_id: number;
   kind: "company" | "root_domain" | "subdomain" | "ip" | "cidr" | "icp" | "keyword";
   company_id?: number;
-  company_name?: string; // 后端 JOIN companies 解析，仅 kind=company 有值
+  company_name?: string; // 백엔드 JOIN companies 분석, kind=company에만 값이 있음
   domain?: string;
   net?: string;
   value?: string;
@@ -366,14 +366,14 @@ export interface TaskScopeRow {
 
 export type CompanyScopeKind = "domain" | "ip" | "cidr" | "icp" | "keyword";
 
-// 新增企业时提交的结构化资产范围规则。
+// 새로운 기업을 추가할 때 제출된 구조화 자산 범위 규칙.
 export interface CompanyScopeRule {
   kind: CompanyScopeKind;
   value: string;
 }
 
-// 资产范围写入的结果。errors 是本次提交里不合法的行；warnings 是与本次提交无关、
-// 但会让归属结果不符合预期的既有数据问题（如 ip 字段存了主机名的资产）。
+// 자산 범위 작성 결과입니다. errors는 이 제출물에서 불법적인 라인입니다. warnings는 이 제출물과 관련이 없습니다.
+// 그러나 속성 결과가 기대에 미치지 못하게 만드는 기존 데이터 문제가 있습니다(예: ip 필드에 저장된 호스트 이름이 있는 자산).
 export interface CompanyScopeMutation {
   added: number;
   skipped: number;
@@ -382,23 +382,23 @@ export interface CompanyScopeMutation {
   warnings?: string[];
 }
 
-// 公司资产范围规则的一条（归属唯一真值来源）。
+// 회사의 자산 범위 규칙 중 하나입니다(단일 진실 소스에 귀속).
 export interface ScopeRow {
   id: number;
   company_id: number;
   kind: CompanyScopeKind;
-  domain?: string; // kind=domain 时有值
-  net?: string; // kind=ip|cidr 时有值
-  value?: string; // kind=icp|keyword 时可能由后端直接返回
-  raw: string; // 原始用户输入，用于显示和回填
+  domain?: string; // kind=domain 일 때 값이 있습니다.
+  net?: string; // kind=ip|cidr는 다음과 같은 경우에 값을 갖습니다.
+  value?: string; // kind=icp|keyword인 경우 백엔드에서 직접 반환될 수 있습니다.
+  raw: string; // 표시 및 백필에 사용되는 원시 사용자 입력
   reason?: string;
 }
 
-// 企业：type=company 的资产节点 + 图标 + 资产计数 + 资产范围规则。
+// 기업: type=company의 자산 노드 + 아이콘 + 자산 수 + 자산 범위 규칙.
 export interface Company {
   id: number;
   name: string;
-  logo?: string; // 远程图标 URL；空则前端用名称首字母
+  logo?: string; // 원격 아이콘 URL; 비어 있는 경우 프런트 엔드에 있는 이름의 첫 글자를 사용하세요.
   asset_count: number;
   scope?: ScopeRow[];
 }
@@ -421,11 +421,11 @@ export interface TaskNode {
   ts: string;
   source_task_id?: string;
   inherited?: boolean;
-  delete_reason?: string; // 意图假删除(state='deleted')时的删除原因
+  delete_reason?: string; // 허위 삭제 의도 시 삭제 사유 (state='deleted')
 }
 
-// 播报板一页:按创建顺序分页的节点 + 这一页涉及的边 + 边另一端的节点(refs,按 id 索引),
-// 这样每条播报都能说清「从哪来、产出了什么」,而不用把整张图拉下来。
+// 게시판의 한 페이지: 생성된 순서대로 페이지가 매겨진 노드 + 이 페이지에 포함된 엣지 + 엣지의 반대쪽 끝에 있는 노드(refs, indexed by id),
+// 이렇게 하면 각 방송에서는 전체 화면을 끌어내리지 않고도 '어디에서 왔으며 무엇을 생산하는지'를 명확하게 설명할 수 있습니다.
 export interface ExplorationNodePage {
   items: TaskNode[];
   total: number;
@@ -433,7 +433,7 @@ export interface ExplorationNodePage {
   size: number;
   edges: Edge[];
   refs: Record<string, TaskNode>;
-  // 节点 id → 该节点锚定的资产(播报板展开时顺带展示,含本页节点与其邻居)。
+  // 노드 id → 이 노드에 고정된 자산(이 페이지의 노드와 그 이웃을 포함하여 게시판이 확장되면 표시됨)
   assets: Record<string, FindingAsset[]>;
 }
 
@@ -446,7 +446,7 @@ export interface ExplorationNodeQuery {
   order?: "asc" | "desc";
 }
 
-// 目标管理卡片用的目标(后端已把 payload 拆成 text/vulnclass)。
+// 대상 관리 카드에 사용되는 대상(백엔드가 payload를 text/vulnclass로 분할했습니다).
 export interface TaskGoal {
   id: string;
   text: string;
@@ -456,7 +456,7 @@ export interface TaskGoal {
   ts: string;
 }
 
-// 约束管理卡片用的操作约束(allow=允许 / deny=禁止)。
+// 제약 조건 관리 카드에 사용되는 작동 제약 조건(allow=허용 / deny=비활성화)
 export type ConstraintKind = "allow" | "deny";
 export interface TaskConstraint {
   id: string;
@@ -469,7 +469,7 @@ export interface TaskConstraint {
 // ---- Findings ----
 export type Severity = "critical" | "high" | "medium" | "low";
 
-// 漏洞处置状态:待处理 / 处理中 / 已确认 / 已处理 / 已修复 / 误报 / 忽略 / 重复 / 风险接受。
+// 취약점 처리 상태: 보류 중/처리 중/확인됨/처리됨/수정됨/거짓양성/무시/중복/위험 허용됨.
 export type FindingStatus =
   | "pending"
   | "in_progress"
@@ -481,7 +481,7 @@ export type FindingStatus =
   | "duplicate"
   | "risk_accepted";
 
-// FindingAsset 是一个漏洞绑定的资产(已在后端预渲染 label)。
+// FindingAsset는 버그가 있는 자산입니다(label는 백엔드에서 사전 렌더링되었습니다).
 export interface FindingAsset {
   id: string;
   type: string;
@@ -494,14 +494,14 @@ export interface Finding {
   report_evidence_version?: number;
   report_stale?: boolean;
   id: string;
-  finding_id?: string; // 独立 findings 表的行 id,状态更新的句柄(任务内旧节点可能缺失)
+  finding_id?: string; // 독립 findings 테이블의 id 행, 상태 업데이트 핸들(작업의 이전 노드가 누락될 수 있음)
   vulnclass: string;
-  name?: string; // 漏洞名称;为空时展示回退到 vulnclass
+  name?: string; // 취약점 이름 비어 있으면 디스플레이가 vulnclass로 돌아갑니다.
   severity: Severity;
   status: FindingStatus;
   summary: string;
   evidence: string;
-  report?: string; // 详细报告(Markdown);仅详情接口返回,列表为空
+  report?: string; // 상세 보고서(Markdown); 세부정보 인터페이스만 반환되고 목록은 비어 있습니다.
   intent_id?: string;
   param_id?: string;
   task_id?: string;
@@ -512,7 +512,7 @@ export interface Finding {
   ts: string;
 }
 
-// FindingsPage 是发现列表的服务端分页响应。
+// FindingsPage는 검색 목록의 서버측 페이지가 매겨진 응답입니다.
 export interface FindingsPage {
   items: Finding[];
   total: number;
@@ -522,7 +522,7 @@ export interface FindingsPage {
 
 export interface FindingGroup {
   task_id: string | number | null;
-  task_name?: string; // 可选任务名称;空/缺省=未命名
+  task_name?: string; // 선택적 작업 이름. 비어 있음/기본값 = 이름 없음
   task_description: string;
   task_status: string;
   count: number;
@@ -548,7 +548,7 @@ export interface FindingDeepenResponse {
   queued: boolean;
 }
 
-// FindingStats 是发现全表聚合(统计卡 + 漏洞类型下拉),服务端计算,不受分页影响。
+// FindingStats는 전체 테이블 집계(통계 카드 + 취약점 유형 드롭다운)이며 서버 측에서 계산되며 페이징의 영향을 받지 않습니다.
 export interface FindingStats {
   total: number;
   pending: number;
@@ -560,34 +560,34 @@ export interface FindingStats {
   tasks: FindingTaskOption[];
 }
 
-// FindingTaskOption 是发现页「按任务」筛选下拉的一项:有漏洞的任务(描述为空表示任务已删除,
-// 前端回退展示 id)及其漏洞条数。
+// FindingTaskOption는 검색 페이지의 "작업별" 필터 드롭다운 목록에 있는 항목입니다. 즉, 취약점이 있는 작업입니다. 설명이 비어 있으면 작업이 삭제되었음을 의미합니다.
+// 프런트 엔드 롤백에는 id) 및 취약점 수가 표시됩니다.
 export interface FindingTaskOption {
   id: string | number;
-  name?: string; // 可选任务名称;空/缺省=未命名
+  name?: string; // 선택적 작업 이름. 비어 있음/기본값 = 이름 없음
   description: string;
   count: number;
 }
 
-// FindingQuery 是发现列表分页/筛选/排序参数。
+// FindingQuery는 검색 목록 페이징/필터링/정렬 매개변수입니다.
 export interface FindingQuery {
   page: number;
   pageSize: number;
   severity?: "all" | Severity;
   status?: "all" | FindingStatus;
   vulnclass?: string;
-  task?: string; // 任务 id;"all"/空 = 不按任务筛选
+  task?: string; // 작업 id;"all"/비어 있음 = 작업별로 필터링하지 않음
   query?: string;
   sort?: "severity" | "time";
-  // 资产树节点 key;选中一个节点 = 选中它的整棵子树。空 = 不按资产筛选。
+  // 자산 트리 노드 key; 노드 선택 = 전체 하위 트리를 선택합니다. 비어 있음 = 자산별로 필터링하지 않습니다.
   assetScope?: string;
 }
 
-// ---- Findings by asset (资产视图) ----
+// ---- Findings by asset(자산 보기) ----
 export type FindingAssetKind = "company" | "root_domain" | "subdomain" | "ip" | "service" | "app" | "endpoint" | "none";
 
-// FindingAssetNode 是资产树的一个节点。key 形如 a:<id>(资产)、c:<id>(企业)、
-// r:<domain>(库里没有资产行的根域名)、__none__(未关联资产)。
+// FindingAssetNode 자산 트리의 노드입니다.。key 모양의 a:<id>(자산)、c:<id>(기업)、
+// r:<domain>(라이브러리에 자산 행의 루트 도메인 이름이 없습니다.)、__none__(연결되지 않은 자산)。
 export interface FindingAssetNode {
   key: string;
   parent?: string;
@@ -595,8 +595,8 @@ export interface FindingAssetNode {
   label: string;
   asset_id?: number;
   company_id?: number;
-  self: number; // 直接挂在该资产上的发现数
-  total: number; // 含子孙、按发现去重
+  self: number; // 이 자산에 직접 연결된 발견 수
+  total: number; // 하위 항목 포함, 발견에 따라 중복 제거
   critical: number;
   high: number;
   medium: number;
@@ -611,7 +611,7 @@ export interface FindingAssetTree {
   dropped_kinds?: string[];
 }
 
-// FINDING_UNASSIGNED_ASSET 与后端 db.FindingUnassignedAsset 对应。
+// FINDING_UNASSIGNED_ASSET는 백엔드 db.FindingUnassignedAsset에 해당합니다.
 export const FINDING_UNASSIGNED_ASSET = "__none__";
 
 // ---- Activity / sessions ----
@@ -629,12 +629,12 @@ export type ActivityKind =
   | "llm_failover" // task-level provider switch / chain exhaustion audit event
   | "intercept_request"; // user-approval request from the intercept layer
 
-// ChatAttachment 是一次上传的文件:path 相对该会话/任务工作目录(即 agent 的 CWD)。
+// ChatAttachment는 한 번 업로드된 파일입니다. path는 세션/작업 작업 디렉터리(예: agent의 CWD)에 상대적입니다.
 export interface ChatAttachment {
   name: string;
   path: string;
   size: number;
-  abs?: string; // 绝对路径(scope=staging 暂存上传时返回;建任务前把它写进描述)
+  abs?: string; // 절대 경로(scope=staging, 임시 업로드 시 반환, 작업 생성 전 설명에 적어두세요)
 }
 
 export interface Activity {
@@ -691,24 +691,24 @@ export interface TaskLLMResolutions {
   worker: TaskLLMResolution;
 }
 
-// ---- Agent triggers (P3 调度，仅自定义 agent) ----
+// ---- Agent triggers (P3 일정, agent만 사용자 정의) ----
 export interface AgentTrigger {
   id: number;
   agent_key: string;
   enabled: boolean;
-  interval_sec: number; // 定时:每 N 秒(0=不定时)
-  on_finding: boolean; // 任意任务发现 finding 时触发
-  on_goal_met: boolean; // 任意任务达成目标时触发
-  on_task_timeout: boolean; // 任意任务超时时触发
-  on_tool_call: boolean; // 选中工具被调用(执行完成)时触发
-  on_task_create: boolean; // 任意任务被创建时触发
-  interval_message: string; // 各触发条件的独立用户消息
+  interval_sec: number; // 타이밍: N초마다(0=예약되지 않음)
+  on_finding: boolean; // 작업이 finding를 발견하면 트리거됩니다.
+  on_goal_met: boolean; // 작업이 목표에 도달하면 트리거됩니다.
+  on_task_timeout: boolean; // 작업 시간이 초과되면 트리거됩니다.
+  on_tool_call: boolean; // 선택한 도구가 호출될 때 트리거됩니다(실행 완료).
+  on_task_create: boolean; // 작업이 생성되면 트리거됩니다.
+  interval_message: string; // 각 트리거 조건에 대한 독립적인 사용자 메시지
   finding_message: string;
   goal_message: string;
   task_timeout_message: string;
   tool_call_message: string;
   task_create_message: string;
-  tool_names: string[]; // on_tool_call 选中的工具 key(至少一个)
+  tool_names: string[]; // on_tool_call 선택한 도구 key (최소 하나)
   last_fire?: string;
 }
 
@@ -794,7 +794,7 @@ export interface BatchControlItem {
   error?: string;
 }
 
-// 批量改分类的逐任务结果。失败只可能是任务已被删除，分类本身的写入是原子的。
+// 일괄 재분류 작업별 결과입니다. 실패는 작업이 삭제된 경우에만 가능하며 범주 자체의 작성은 원자적입니다.
 export interface BatchCategoryItem {
   id: string;
   ok: boolean;
@@ -910,8 +910,8 @@ export interface TrafficHost {
 // ---- App settings (runtime toggles) ----
 export interface Settings {
   traffic_capture: boolean;
-  agent_traffic_binding: boolean; // Agent 自动绑定流量证据，默认关闭；不影响人工绑定
-  llm_record: boolean; // LLM 录制开关（默认关）；关闭时不记录任何 LLM 调用
+  agent_traffic_binding: boolean; // Agent 교통 증거를 자동으로 바인딩하며 기본적으로 꺼져 있습니다. 수동 바인딩에는 영향을 미치지 않습니다.
+  llm_record: boolean; // LLM 녹음 스위치(기본값은 꺼짐); 꺼지면 LLM 통화가 녹음되지 않습니다.
   // Web search. brave_key_set / tavily_key_set reflect whether a key is stored
   // (the values are never returned). On PUT, send the corresponding field to set/clear.
   web_search_enabled: boolean;
@@ -921,49 +921,49 @@ export interface Settings {
   // write-only: only sent on PUT to store/clear the key.
   brave_search_api_key?: string;
   tavily_search_api_key?: string;
-  // 独立出口代理(http/https/socks5)，用于访问搜索端点；与记录流量的 MITM 代理无关。空=直连。
+  // 검색 엔드포인트에 액세스하는 데 사용되는 독립형 송신 프록시(http/https/socks5). 트래픽을 기록하는 MITM 프록시와 독립적입니다. 비어 있음 = 직접 연결.
   web_search_proxy?: string;
-  // 全局出口代理(http/https/socks5，可带 user:pass)，所有目标流量走它。开启流量捕获时作为
-  // MITM 上游；关闭捕获时直接注入 agent 的 bash/WebFetch。空=直连。
+  // 글로벌 송신 프록시(http/https/socks5, user:pass를 가져올 수 있음), 모든 대상 트래픽이 이를 통과합니다. 트래픽 캡처가 켜진 경우
+  // MITM 업스트림; 캡처가 꺼지면 bash/WebFetch가 agent에 직접 주입됩니다. 비어 있음 = 직접 연결.
   global_proxy?: string;
-  python_interpreter?: string; // 自定义脚本工具的 python 解释器路径(空=运行时检测)
-  workers?: number; // 并发工作 agent 数(默认3)；对之后启动的任务生效
-  // 任务并发上限:同时「运行中」的任务数上限。关闭=不限;开启后新建任务超限则排队,有空位自动启动。
-  task_concurrency_enabled?: boolean; // 默认 false
-  task_concurrency_limit?: number; // 开启后默认 5
-  // LLM 轮询(故障转移)。默认关；开启后「未指定模型」的 agent 在当前配置不可用
-  // （余额不足/key 失效/限流/服务异常）时自动切到下一个配置。
-  llm_pool_enabled?: boolean; // 默认 false
-  // 绑定了指定配置的 agent/任务失败时是否也回落到轮询链。默认 false = 绑定即独占。
+  python_interpreter?: string; // 사용자 정의 스크립트 도구용 python 인터프리터 경로(비어 있음 = 런타임 감지)
+  workers?: number; // 동시 작업 수 agent(기본값 3); 나중에 시작된 작업에 효과적입니다.
+  // 작업 동시성 상한: 동시에 "실행"되는 작업 수의 상한입니다. 끄기 = 제한 없음; 활성화된 후 새 작업이 제한을 초과하면 대기열에 추가되고 공간이 있으면 자동으로 시작됩니다.
+  task_concurrency_enabled?: boolean; // 기본 false
+  task_concurrency_limit?: number; // 개봉 후 기본값은 5입니다.
+  // LLM 폴링(장애 조치). 기본적으로 꺼져 있습니다. 전원을 켜면 "지정되지 않은 모델"의 agent는 현재 구성에서 사용할 수 없습니다.
+  // (잔액 부족/key 무효/전류 제한/서비스 이상) 자동으로 다음 구성으로 전환됩니다.
+  llm_pool_enabled?: boolean; // 기본 false
+  // 지정된 구성에 바인딩된 agent/ 작업이 실패할 경우 폴링 체인으로 대체되는지 여부입니다. 기본값 false = 바인딩은 배타적을 의미합니다.
   llm_pool_bind_fallback?: boolean;
-  // 操作约束注入范围(默认都开):把任务的 allow/deny 约束拼进对应 agent 的系统提示。
+  // 작업 제약 조건 주입 범위(기본적으로 모두 활성화됨): 작업의 allow/deny 제약 조건을 agent에 해당하는 시스템 프롬프트에 삽입합니다.
   constraints_inject_planner?: boolean;
   constraints_inject_worker?: boolean;
-  // 实验功能:noa 模型驱动上下文压缩(默认关)。开启后平台接入的四类 agent(planner/
-  // worker/主 agent/对话)由 noa 接管上下文压缩,取代内置 compaction;每 run 读一次,对
-  // 之后启动的 run 生效。
+  // 실험적 기능: noa 모델 기반 컨텍스트 압축(기본적으로 꺼져 있음) agent(planner/)의 4가지 유형
+  // worker/ 마스터 agent/ 대화) 및 noa는 내장된 compaction를 대체하여 컨텍스트 압축을 대신합니다. 모든 run는 한 번 읽혀집니다.
+  // 나중에 시작된 run가 적용됩니다.
   noa_compaction?: boolean;
-  // ---- 漏洞 IM 推送（渠道本身是独立资源，见 /api/notify/*，这里只有三项全局配置）----
-  notify_enabled?: boolean; // 推送总开关，默认开；用于维护期一键止血
-  notify_public_base_url?: string; // 漏洞详情回链的外部访问地址；空=消息不带回链
-  notify_digest_interval_min?: number; // 汇总模式周期（分钟），默认 30
+  // ---- 취약점 IM 푸시(채널 자체는 독립적인 리소스입니다. /api/notify/* 참조, 여기에는 세 가지 전역 구성만 있습니다) ----
+  notify_enabled?: boolean; // 기본 스위치를 누르십시오. 기본적으로 켜져 있습니다. 유지 관리 기간 동안 한 번의 클릭으로 출혈을 멈추는 데 사용됩니다.
+  notify_public_base_url?: string; // 취약점 세부정보 반환 링크의 외부 액세스 주소입니다. 비어 있음 = 메시지가 링크를 반환하지 않습니다.
+  notify_digest_interval_min?: number; // 요약 모드 기간(분), 기본값 30
 }
 
-// ---- 漏洞 IM 推送 ----
+// ---- IM 푸시 취약점 ----
 
-// NotificationFilter 是渠道的过滤条件，字段全部可选，缺省即不过滤。
-// 后端对所有字段都不加校验：配置畸形时按「命中」处理（宁可多推不可漏推）。
+// NotificationFilter는 채널의 필터 조건이며 모든 필드는 선택 사항이며 기본값은 필터링 없음입니다.
+// 백엔드는 모든 필드를 확인하지 않습니다. 구성이 잘못되면 "적중"으로 처리됩니다(놓치는 것보다 더 많이 푸시하는 것이 좋습니다).
 export interface NotificationFilter {
   min_severity?: string; // "" | low | medium | high | critical
-  task_ids?: number[]; // 空=不限；非空则要求与漏洞所属任务有交集
-  asset_ids?: number[]; // 空=不限；非空则要求与漏洞锚定资产有交集
-  vulnclass_include?: string[]; // 空=全收；非空则要求漏洞类型命中任一关键词（大小写不敏感子串）
-  vulnclass_exclude?: string[]; // 命中任一关键词即排除（排除优先于包含）
-  on_status_change?: boolean; // 是否也接收漏洞处置状态变更事件
+  task_ids?: number[]; // 비어 있음 = 제한 없음 비어 있지 않으면 취약점이 속한 작업과의 교차가 필요합니다.
+  asset_ids?: number[]; // 비어 있음 = 제한 없음 비어 있지 않은 경우 취약점 고정 자산과의 교차가 필요합니다.
+  vulnclass_include?: string[]; // 비어 있음 = 모두 수락; 비어 있지 않으면 취약점 유형이 모든 키워드에 도달해야 합니다(대소문자를 구분하지 않는 하위 문자열).
+  vulnclass_exclude?: string[]; // 제외할 키워드를 누르세요(포함보다 제외가 우선 적용됨).
+  on_status_change?: boolean; // 취약점 처리 상태 변경 이벤트도 수신할지 여부
 }
 
-// NotificationChannel 是一个渠道实例。config 的字段随 kind 而异，
-// 且凭据字段在读取时被替换成 "__masked__" 开头的掩码值——原样回传即表示「不改」。
+// NotificationChannel는 채널 인스턴스입니다. config의 필드는 kind에 따라 다릅니다.
+// 그리고 자격 증명 필드는 읽을 때 "__masked__"로 시작하는 마스크 값으로 대체됩니다. 그대로 반환하면 "변경 없음"을 의미합니다.
 export interface NotificationChannel {
   id: number;
   name: string;
@@ -975,12 +975,12 @@ export interface NotificationChannel {
   rate_per_min: number;
   created_at: string;
   updated_at: string;
-  // secret_keys 由后端按渠道类型给出，前端据此渲染密码框与「留空即不改」提示，
-  // 不硬编码任何渠道知识。
+  // secret_keys는 채널 유형에 따라 백엔드에 의해 제공되며, 프런트엔드는 그에 따라 비밀번호 상자와 "변경하지 않으려면 공백으로 남겨두세요" 프롬프트를 렌더링합니다.
+  // 채널 지식이 하드 코딩되어 있지 않습니다.
   secret_keys: string[];
 }
 
-// NotificationKind 是 /api/notify/meta 返回的渠道类型元数据。
+// NotificationKind는 /api/notify/meta에서 반환된 채널 유형 메타데이터입니다.
 export interface NotificationKind {
   kind: string;
   default_rate_per_min: number;
@@ -1003,7 +1003,7 @@ export interface NotificationMeta {
   };
 }
 
-// NotificationDelivery 是一条投递记录，用于投递历史与失败重发。
+// NotificationDelivery는 배송기록으로, 배송이력 및 재전송실패에 사용됩니다.
 export interface NotificationDelivery {
   id: number;
   finding_id: string;
@@ -1034,67 +1034,67 @@ export interface LLMProfile {
   rate_per_second: number;
   rate_per_minute: number;
   context_window_k?: number;
-  // 思考开关(thinking.type): ""=不发送(默认) | "disabled"=关闭 | "enabled"=开启
+  // 생각 스위치(thinking.type): ""=보내지 않음(기본값) | "disabled"=끄기 | "enabled"=켜짐
   thinking_type?: string;
-  // 思考强度: ""=不发送(默认) | "low"/"medium"/"high"/"xhigh"/"max"
+  // 사고 강도: ""=보내지 않음(기본값) | "low"/"medium"/"high"/"xhigh"/"max"
   reasoning_effort?: string;
   is_default: boolean;
-  // 轮询顺位：越大越先被选中。激活配置恒为链首，与本值无关。
+  // 폴링 순서: 값이 클수록 먼저 선택됩니다. 활성 구성은 항상 체인의 헤드이며 이 값과 아무 관련이 없습니다.
   priority?: number;
-  // true = 不作为故障转移目标（仍可被 agent/任务显式绑定使用）。
+  // true = 장애 조치 대상으로 사용되지 않습니다(여전히 agent/ 작업에 명시적으로 바인딩될 수 있음).
   pool_exclude?: boolean;
-  // true（默认）= 流式(SSE) | false = 真·非流式(stream:false，一次性返回)。
+  // true(기본값) = 스트리밍(SSE) | false = True·비스트리밍(stream:false, 한 번에 반환됨).
   streaming?: boolean;
-  // 单次回复的输出上限(token)。0 = 不发送该字段，由服务端默认值决定。
-  // 注意与 context_window_k 区分：后者是模型总容量，只在本地用于压缩阈值。
+  // 단일 응답의 출력 상한(token)입니다. 0 = 서버의 기본값에 따라 결정된 이 필드를 보내지 않습니다.
+  // context_window_k와의 차이점에 유의하세요. 후자는 모델의 총 용량이며 압축 임계값에 로컬로만 사용됩니다.
   max_tokens?: number;
-  // 上限用哪个请求字段名，仅 format="openai" 有意义：
-  // ""=max_tokens(默认) | "max_completion_tokens"(OpenAI 推理模型只认它)
+  // 상한에는 어떤 요청 필드 이름이 사용됩니까? format="openai"만 의미가 있습니다.
+  // ""=max_tokens(기본값) | "max_completion_tokens" (OpenAI 추론 모델만 인식함)
   max_tokens_field?: string;
-  // 自定义会话头名：非空时每次请求带该 HTTP 头，头值=当前会话/意图的 session id。
-  // ""=不发送。用于按 session-id 头做提示缓存/粘性路由的网关。
+  // 사용자 정의된 세션 헤더 이름: 비어 있지 않은 경우 각 요청은 HTTP 헤더를 전달하며 헤더 값 = 현재 세션/의도의 session id입니다.
+  // ""=보내지 않습니다. session-id 헤더를 기반으로 하는 신속한 캐싱/고정 라우팅을 위한 게이트웨이입니다.
   session_header_key?: string;
-  // 本配置对重试的覆盖（建连/空响应/同 provider 安全窗口）。留空/全 0 = 跟随全局策略。
+  // 이 구성에는 재시도(연결 설정/빈 응답/provider 보안 창과 동일)가 포함됩니다. 비워두기/모두 0 = 글로벌 정책을 따릅니다.
   retry?: LLMRetryOverride;
 }
 
-// ---- LLM 重试策略 ----
-// 一层重试的两个旋钮。两者都是「0 = 未配置」：
-//   attempts    0=用默认次数 | -1=关闭该层重试 | >0=重试次数
-//   interval_ms 0=用默认的指数退避 | >0=改用这个固定毫秒间隔
+// ---- LLM 재시도 전략 ----
+// 다시 시도할 손잡이 2개의 레이어 1개. 둘 다 "0 = 구성되지 않음"입니다.
+//   attempts 0=기본 횟수 사용 | -1=이 레이어를 닫고 다시 시도 | >0=재시도 횟수
+//   interval_ms 0=기본 지수 백오프 사용 | >0=대신 이 고정된 밀리초 간격을 사용합니다.
 export interface LLMRetryRule {
   attempts: number;
   interval_ms: number;
 }
 
-// 单个 LLM 配置能覆盖的三层（都是「跟着端点走」的重试）。
+// 단일 LLM 구성은 3개의 레이어를 포괄할 수 있습니다(모두 "엔드포인트 따르기" 재시도).
 export interface LLMRetryOverride {
-  connect: LLMRetryRule; // 建连重试：连接重置/超时/429/5xx，流开始前
-  empty: LLMRetryRule; // 空响应重试：完成但没有任何内容（仅 openai 格式）
-  stream: LLMRetryRule; // 同 provider 安全窗口重试：未交付输出前的断流重放
+  connect: LLMRetryRule; // 연결 설정 재시도: 스트림 시작 전 연결 재설정/시간 초과/429/5xx
+  empty: LLMRetryRule; // 빈 응답 재시도: 내용 없이 완료됨(openai 형식만 해당)
+  stream: LLMRetryRule; // provider 안전 창 재시도와 동일: 출력이 전달되기 전 중단 재생
 }
 
-// 全局策略 = 上面三层的默认值 + 两层只有全局的：
-//   breaker 轮询熔断（attempts=连续几次瞬时失败熔断，interval_ms=固定冷却时长）
-//   intent  意图重跑（worker 以 model_error 收场后整条意图重跑）
+// 글로벌 정책 = 위 세 레이어의 기본값 + 두 레이어는 글로벌 전용입니다.
+//   breaker 폴링 퓨즈(attempts=여러 차례 연속 순간 퓨즈 고장, interval_ms=고정 냉각 시간)
+//   intent는 재실행 예정입니다(worker가 model_error로 끝난 후 전체 라인이 재실행될 예정입니다).
 export interface LLMRetryPolicy extends LLMRetryOverride {
   breaker: LLMRetryRule;
   intent: LLMRetryRule;
 }
 
-// ---- LLM 轮询（故障转移）----
-// 一个配置在轮询链中的位置与健康状态。state:
-//   ok       正常
-//   degraded 有连续失败但未达熔断阈值
-//   tripped  已熔断，冷却期内被跳过（cooldown_secs 为剩余秒数）
+// ---- LLM 폴링(장애 조치)----
+// 폴링 체인에서 구성의 위치 및 상태입니다. state:
+//   ok 노멀
+//   degraded에 지속적인 오류가 발생하지만 퓨즈 임계값에 도달하지 않습니다.
+//   냉각 기간 동안 tripped가 터져 건너뛰었습니다. (cooldown_secs는 남은 초입니다.)
 export interface LLMPoolMember {
   profile_id: string;
   name: string;
   model: string;
   format: string;
   priority: number;
-  active: boolean; // 是否为当前激活配置（恒为链首）
-  excluded: boolean; // pool_exclude：不参与轮询
+  active: boolean; // 현재 활성 구성인지 여부(항상 체인의 헤드)
+  excluded: boolean; // pool_exclude: 폴링에 참여하지 않음
   state: "ok" | "degraded" | "tripped";
   fails: number;
   trips: number;
@@ -1112,22 +1112,22 @@ export interface LLMPoolStatus {
 // ---- Agents ----
 export interface Agent {
   id: string;
-  key: string; // 内置为 goals/planner/mainagent/worker；自定义为用户自定 key
+  key: string; // 내장은 goals/planner/mainagent/worker입니다. 맞춤형은 사용자 정의 key입니다.
   name: string;
   description?: string;
   role: string;
   builtin: boolean;
   enabled: boolean;
-  llm_profile_id?: number | null; // 绑定的 LLM 配置；null/absent = 跟随任务/会话/全局
-  max_turns?: number; // 0 = 无限制
-  run_seconds?: number; // worker 单次运行墙钟上限(秒)；0 = 无限制
-  web_search?: boolean; // 是否启用网络搜索(受系统全局开关门控)
-  interactive_shell?: boolean; // 是否启用交互式 shell(持久 PTY 会话工具族)
-  // P3 触发后处理策略(仅自定义 agent 有意义)
-  trigger_run_mode?: "serial" | "parallel"; // 串行排队 / 每次触发各自并发一个会话
-  trigger_merge_mode?: "by_task" | "all" | "none"; // 仅 serial：同任务合并 / 全部合并 / 不合并
-  trigger_max_parallel?: number; // 仅 parallel：每 agent 并发上限；0=不限
-  // 绑定数量(仅列表接口返回)：可见 MCP / 可见 Skill / 绑定工具
+  llm_profile_id?: number | null; // LLM 구성 바인딩; null/absent = 작업/세션/글로벌 팔로우
+  max_turns?: number; // 0 = 제한 없음
+  run_seconds?: number; // worker 단일 작동 벽시계 상한(초); 0 = 제한 없음
+  web_search?: boolean; // 네트워크 검색 활성화 여부(시스템 전역 스위치에 의해 제어됨)
+  interactive_shell?: boolean; // 대화형 shell(영구 PTY 세션 도구 제품군) 활성화 여부
+  // P3 트리거 사후 처리 전략(맞춤형 agent만 의미 있음)
+  trigger_run_mode?: "serial" | "parallel"; // 직렬 대기열/각 트리거에는 동시 세션이 있습니다.
+  trigger_merge_mode?: "by_task" | "all" | "none"; // serial만: 동일한 작업 병합/모두 병합/병합 없음
+  trigger_max_parallel?: number; // parallel만 해당: agent당 동시성 제한. 0=제한 없음
+  // 바인딩 수량(목록 인터페이스에서만 반환됨): 표시 MCP / 표시 Skill / 바인딩 도구
   mcp_count?: number;
   skill_count?: number;
   tool_count?: number;
@@ -1153,13 +1153,13 @@ export interface AgentDetail {
   variables: PromptVar[];
   versions: PromptVersion[];
   visibility: { mcp: number[]; skill: string[] };
-  // 可绑定的 LLM 配置候选(供「默认模型」下拉)；当前绑定见 agent.llm_profile_id
+  // 바인딩 가능 LLM 구성 후보(~을 위한「기본 모델」드롭다운)；현재 바인딩 보기 agent.llm_profile_id
   llm_profiles?: { id: number; name: string; model: string; is_default: boolean }[];
-  wrapup_prompt?: string; // 已保存的收尾提示词(空=用内置默认)
-  wrapup_default?: string; // 内置默认收尾提示词(占位/恢复默认)
-  wrapup_max_turns?: number; // 已保存的收尾轮数(0=用内置默认)
-  wrapup_max_turns_default?: number; // 内置默认收尾轮数(供 "0=默认N" 提示)
-  // 任务级超时收尾词(仅 worker/planner，task_timeout_wrapup_supported=true 时才显示该分区)
+  wrapup_prompt?: string; // 닫는 프롬프트 단어가 저장되었습니다(비어 있음 = 내장된 기본값 사용).
+  wrapup_default?: string; // 내장된 기본 닫기 프롬프트 단어(자리 표시자/기본값 복원)
+  wrapup_max_turns?: number; // 저장된 마감 라운드 수(0=내장된 기본값 사용)
+  wrapup_max_turns_default?: number; // 내장된 기본 마감 라운드 번호("0=기본 N" 프롬프트의 경우)
+  // 작업 수준 시간 초과 종료 단어(이 파티션은 worker/planner, task_timeout_wrapup_supported=true인 경우에만 표시됨)
   task_timeout_wrapup_supported?: boolean;
   task_timeout_wrapup_prompt?: string;
   task_timeout_wrapup_default?: string;
@@ -1196,23 +1196,23 @@ export interface SkillItem {
   compatibility?: string; // optional: environment requirements
   mcps?: string[]; // MCP server names this skill unlocks on load
   files: string[]; // files in the skill directory
-  // 调用统计（skill_usage 账本）。从未被调用过的 skill：calls=0、last_used 缺省。
+  // 호출 통계(skill_usage 원장). skill는 호출된 적이 없습니다: calls=0, last_used 기본값.
   calls: number;
-  tasks: number; // 加载过它的任务数（chat 会话不计入）
-  usage_agents: string[]; // 加载过它的 agent key
+  tasks: number; // 로드한 작업 수(chat 세션은 계산되지 않음)
+  usage_agents: string[]; // 로드한 agent key
   last_used?: string;
 }
 
-// SkillCall 是一次 Skill() 调用（单个 skill 的最近调用列表）。
+// SkillCall는 Skill()에 대한 호출입니다(단일 skill에 대한 최근 호출 목록).
 export interface SkillCall {
   ts: string;
   agent_key: string;
-  task_id: number; // 0 = 非任务场景（对话会话）
+  task_id: number; // 0 = 미션이 아닌 시나리오(대화 세션)
   session_id: string;
   args_len: number;
 }
 
-// MissingSkill 是被点名但不存在的 skill —— "想用但没有"的缺口。
+// MissingSkill는 이름은 있지만 존재하지 않는 skill입니다. 즉, "사용하고 싶지만 가지고 있지 않습니다"라는 격차입니다.
 export interface MissingSkill {
   skill: string;
   calls: number;
@@ -1220,7 +1220,7 @@ export interface MissingSkill {
   last_used?: string;
 }
 
-// ---- Tools (内置工具目录) ----
+// ---- Tools(내장 도구 디렉터리) ----
 // key + handler live in Go; only these fields are page-editable. system tools lock
 // the key and the parameter *structure* (name/type/required) — the per-param
 // description/default and the agent binding are what move.
@@ -1232,10 +1232,10 @@ export interface Tool {
   schema: Record<string, any>; // full JSON-Schema (object with properties)
   agents: string[]; // bound agent keys
   enabled: boolean;
-  kind?: "builtin" | "shell" | "command" | "script" | "http"; // 自定义工具类型
+  kind?: "builtin" | "shell" | "command" | "script" | "http"; // 맞춤형 도구 유형
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  exec?: Record<string, any>; // 自定义工具执行规格(kind!=builtin)
-  deferred?: boolean; // schema 延迟(SearchExtraTools/ExecuteExtraTool)
+  exec?: Record<string, any>; // 사용자 정의 도구 실행 사양(kind!=builtin)
+  deferred?: boolean; // schema 지연 (SearchExtraTools/ExecuteExtraTool)
   calls?: number; // persistent runtime invocation count (older APIs may omit it)
 }
 
@@ -1271,7 +1271,7 @@ export interface InterceptRule {
   updated_at: string;
 }
 
-// ---- Asset Intercept Rules（资产拦截：全局黑名单） ----
+// ---- Asset Intercept Rules (자산 차단: 글로벌 블랙리스트) ----
 export type AssetInterceptKind =
   | "exact_domain"
   | "exact_ip"
@@ -1281,10 +1281,10 @@ export type AssetInterceptKind =
   | "fuzzy_url"
   | "cidr";
 
-// action 仅用于任务级规则：block=拦截(禁止测试) allow=允许(白名单)。
+// action 작업 수준 규칙에만 해당: block=차단(테스트 비활성화) allow=허용(허용 목록).
 export type AssetInterceptAction = "block" | "allow";
 
-// 任务级资产拦截/允许规则的录入项（创建任务、任务详情编辑使用）。
+// 작업 수준 자산 차단/허용 규칙에 대한 입력 항목(작업 생성 및 작업 세부정보 편집 시 사용)
 export interface AssetInterceptRuleInput {
   action: AssetInterceptAction;
   kind: AssetInterceptKind;
@@ -1296,7 +1296,7 @@ export interface AssetInterceptRuleInput {
 export interface AssetInterceptRule {
   id: number;
   enabled: boolean;
-  action?: AssetInterceptAction; // 全局规则不带此字段（恒为拦截）；任务级规则区分 block/allow
+  action?: AssetInterceptAction; // 전역 규칙에는 이 필드가 없습니다(항상 가로채기). 작업 수준 규칙은 block/allow를 구별합니다.
   kind: AssetInterceptKind;
   pattern: string;
   note: string;
@@ -1316,23 +1316,23 @@ export interface InterceptPending {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_input: Record<string, any>;
   status: "pending" | "allowed" | "denied" | "timeout";
-  reason: string; // 规则 message 或模型判定理由(模型判定带 [模型] 前缀)
+  reason: string; // 규칙 message 또는 모델 판단 사유(모델 판단 앞에 [모델]이 붙음)
   decided_at?: string;
   created_at: string;
 }
 
-// JudgeConfig: 模型兜底审批(仅当没有任何拦截规则命中时由模型判断)的全局配置。
+// JudgeConfig: 모델 승인의 전역 구성(차단 규칙이 적용되지 않는 경우에만 모델에 의해 판단됨).
 export interface JudgeConfig {
   enabled: boolean;
-  profile_id: number; // 0 = 跟随激活/默认配置
-  prompt: string; // 判定提示词;GET 未设置时后端回填内置模板全文
-  timeout_seconds: number; // 模型调用超时
-  fail_action: "allow" | "ask" | "deny"; // 模型出错/超时/不可解析时的回退
-  ask_timeout_seconds: number; // 模型判 ask 转人工后的审批等待超时
-  ask_timeout_action: "allow" | "deny"; // 审批超时后的默认动作
+  profile_id: number; // 0 = 활성/기본 구성을 따릅니다.
+  prompt: string; // 결정 프롬프트 단어; GET 설정하지 않으면 백엔드가 내장 템플릿의 전체 텍스트를 백필합니다.
+  timeout_seconds: number; // 모델 호출 시간 초과
+  fail_action: "allow" | "ask" | "deny"; // 모델 오류/시간 초과/파싱할 수 없는 경우 대체
+  ask_timeout_seconds: number; // 모델 판단 ask 수동 전환 후 승인 대기 시간 초과
+  ask_timeout_action: "allow" | "deny"; // 승인 시간 초과 후 기본 작업
 }
 
-// JudgeUsage: 模型兜底审批(judge 通道)的累计 token 用量 + 近 N 天每日序列。
+// JudgeUsage: 모델 승인의 누적 token 사용량(judge 채널) + 지난 N 일수의 일일 순서입니다.
 export interface JudgeDayUsage {
   date: string; // YYYY-MM-DD (UTC)
   calls: number;
@@ -1360,7 +1360,7 @@ export interface InterceptApprovalRow extends InterceptPending {
   rule_name: string; // "" if rule was deleted
 }
 
-// ── 资产同步 (ScopeSentry 数据源) ──────────────────────────────────────────────
+// ── 자산 동기화(ScopeSentry 데이터 소스) ─────────────────────────────────────────
 export interface SSProject {
   id: string; // MongoDB ObjectID — used as filter.project
   name: string;
@@ -1401,7 +1401,7 @@ export interface CommandRecord {
   created_at: string;
 }
 
-// 单个工具的调用统计（/commands/stats）；errors 为其中失败的次数。
+// 단일 도구(/commands/stats)의 호출 통계; errors는 실패 횟수입니다.
 export interface ToolStat {
   tool: string;
   total: number;
@@ -1429,9 +1429,9 @@ export interface LLMRecordItem {
 export interface LLMRecordDetail extends LLMRecordItem {
   request_body: string;
   response_body: string;
-  // provider 实际收发的 HTTP 原文：请求为 buildBody() 发出的完整 body（含工具
-  // schema），响应为原始 SSE 帧。上面的 request_body/response_body 是归一化视图，
-  // 丢弃了工具 schema 与 tool_use 块。旧记录为空。
+  // provider HTTP가 실제로 보내고 받았습니다. 원본 텍스트: buildBody()에서 보낸 완전한 body에 대한 요청(도구 포함)
+  // schema), 응답은 원래 SSE 프레임입니다. 위의 request_body/response_body는 정규화된 뷰이며,
+  // 도구 schema 및 tool_use 블록이 폐기되었습니다. 이전 레코드가 비어 있습니다.
   raw_request?: string;
   raw_response?: string;
 }
@@ -1561,41 +1561,41 @@ export interface FindingTrafficDetail {
   response: EvidenceBodyPreview;
 }
 
-/** GET /api/update/check —— 当前版本与 GitHub 最新正式版的比较结果。 */
+/** GET /api/update/check - GitHub의 최신 버전과 최신 공식 버전을 비교합니다. */
 export interface UpdateCheck {
-  /** 当前运行的版本；开发构建为 "dev" 或 git describe 的带后缀形式。 */
+  /** 현재 실행 중인 버전입니다. 개발 빌드는 "dev" 또는 git describe의 접미사 형식입니다. */
   current: string;
-  /** 运行形态。docker 下换装只作用于容器可写层，重建容器会退回镜像版本。 */
+  /** 달리기 형태. docker에서 다시 설치하면 컨테이너의 쓰기 가능한 레이어에만 영향을 미치며 컨테이너를 다시 빌드하면 이미지 버전이 반환됩니다. */
   mode: "docker" | "binary";
   os: string;
   arch: string;
   repo: string;
-  /** 是否存在可回滚的上一版本（artex.old）。 */
+  /** 롤백 가능한 이전 버전(artex.old)이 있는지 여부. */
   has_backup: boolean;
-  /** 本次启动时自更新自举的结论（换装失败 / 已回滚等），无事发生时为空。 */
+  /** 이 시작 중 자체 업데이트된 부트스트랩의 결론(교체 실패/롤백 등)은 아무 일도 일어나지 않으면 비어 있게 됩니다. */
   boot_notice?: string;
   rolled_back?: boolean;
-  /** 查询 GitHub 失败时给出原因，此时下面的字段都不会有。 */
+  /** GitHub 쿼리가 실패할 경우 이유를 설명하세요. 현재로서는 다음 필드를 사용할 수 없습니다. */
   error?: string;
   latest?: string;
   notes?: string;
   html_url?: string;
   published_at?: string;
-  /** 当前平台对应的发布包名，以及该 Release 是否真的带了它。 */
+  /** 현재 플랫폼에 해당하는 릴리스 패키지 이름과 Release가 실제로 함께 제공되는지 여부입니다. */
   asset?: string;
   asset_available?: boolean;
   size?: number;
   has_update?: boolean;
-  /** 双方版本号是否可比较；开发构建为 false，此时禁用一键更新。 */
+  /** 양 당사자의 버전 번호가 비교 가능한지 여부 개발 빌드는 false이며 현재 원클릭 업데이트는 비활성화되어 있습니다. */
   comparable?: boolean;
-  /** comparable 为 false 时的说明。 */
+  /** comparable가 false인 경우의 설명입니다. */
   reason?: string;
 }
 
-/** /api/update/stream 推送的一条更新进度。 */
+/** /api/update/stream에 의해 푸시된 업데이트 진행 상황입니다. */
 export interface UpdateProgress {
   phase: "idle" | "downloading" | "verifying" | "extracting" | "staged" | "failed";
-  /** 仅下载阶段有意义（0-100）；其余阶段为 -1。 */
+  /** 다운로드 단계만 의미가 있습니다(0-100). 나머지 단계는 -1입니다. */
   percent: number;
   message: string;
   version?: string;

@@ -1,8 +1,8 @@
-# Request Mocking
+# 요청 모킹
 
-Intercept, mock, modify, and block network requests.
+네트워크 요청을 가로채고, 조롱하고, 수정하고, 차단합니다.
 
-## CLI Route Commands
+## CLI 경로 명령
 
 ```bash
 # Mock with custom status
@@ -25,20 +25,20 @@ playwright-cli unroute "**/*.jpg"
 playwright-cli unroute
 ```
 
-## URL Patterns
+## URL 패턴
 
 ```
-**/api/users           - Exact path match
-**/api/*/details       - Wildcard in path
-**/*.{png,jpg,jpeg}    - Match file extensions
-**/search?q=*          - Match query parameters
+**/api/users - 정확한 경로 일치
+**/api/*/details - 경로의 와일드카드
+**/*.{png,jpg,jpeg} - 파일 확장자 일치
+**/search?q=* - 쿼리 매개변수 일치
 ```
 
-## Advanced Mocking with run-code
+## 실행 코드를 사용한 고급 모의
 
-For conditional responses, request body inspection, response modification, or delays:
+조건부 응답의 경우 본문 검사, 응답 수정 또는 지연을 요청합니다.
 
-### Conditional Response Based on Request
+### 요청에 따른 조건부 응답
 
 ```bash
 playwright-cli run-code "async page => {
@@ -53,7 +53,7 @@ playwright-cli run-code "async page => {
 }"
 ```
 
-### Modify Real Response
+### 실제 응답 수정
 
 ```bash
 playwright-cli run-code "async page => {
@@ -66,7 +66,7 @@ playwright-cli run-code "async page => {
 }"
 ```
 
-### Simulate Network Failures
+### 네트워크 장애 시뮬레이션
 
 ```bash
 playwright-cli run-code "async page => {
@@ -75,7 +75,7 @@ playwright-cli run-code "async page => {
 # Options: connectionrefused, timedout, connectionreset, internetdisconnected
 ```
 
-### Delayed Response
+### 지연된 응답
 
 ```bash
 playwright-cli run-code "async page => {

@@ -41,42 +41,42 @@ import type {
   TaskScopeRow,
 } from "@/lib/types";
 
-// 紧凑格式化 token 数（12345 → 12.3k，2000000 → 2M）。
+// 컴팩트 형식 token 번호(12345 → 12.3k, 2000000 → 2M).
 function fmtTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
   if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k";
   return String(n);
 }
 
-// 缓存命中率 = 缓存读 / 输入（InputTokens 已含 cache_read 子集，故比值在 0–100%）。
+// 캐시 적중률 = 캐시 읽기/입력(InputTokens에는 이미 cache_read 하위 집합이 포함되어 있으므로 비율은 0~100%입니다.)
 function cacheHitRate(cacheRead: number, input: number): string {
   if (input <= 0) return "—";
   return Math.round((cacheRead / input) * 100) + "%";
 }
 
-// 测试范围一条的显示值：域名 / 网段 / 公司。
+// 테스트 범위(도메인 이름/네트워크 세그먼트/회사) 중 한 항목의 표시 값입니다.
 function scopeValue(row: TaskScopeRow): string {
   if (row.value) return row.value;
   if (row.domain) return row.domain;
   if (row.net) return row.net;
-  if (row.company_id) return row.company_name?.trim() ? row.company_name : `企业 #${row.company_id}`;
+  if (row.company_id) return row.company_name?.trim() ? row.company_name : `기업 #${row.company_id}`;
   return "—";
 }
 
 const SCOPE_KIND_LABELS: Record<TaskScopeRow["kind"], string> = {
-  company: "公司",
-  root_domain: "根域名",
-  subdomain: "子域名",
+  company: "회사",
+  root_domain: "루트 도메인 이름",
+  subdomain: "하위 도메인",
   ip: "IP",
-  cidr: "网段",
+  cidr: "네트워크 세그먼트",
   icp: "ICP",
-  keyword: "关键词",
+  keyword: "키워드",
 };
 
 const SCOPE_SOURCE_LABELS: Record<TaskScopeRow["source"], string> = {
-  auto: "自动",
+  auto: "오토매틱",
   agent: "Agent",
-  manual: "手动",
+  manual: "수동",
 };
 
 function StatCard({
@@ -116,17 +116,17 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     pct: number | null;
     by_type: { type: string; total: number; tested: number }[];
   } | null>(null);
-  // 正在重跑的意图 id（含 "__all__" 表示批量），用于禁用按钮 + 转圈。
+  // 다시 뛰겠다는 의지 id（포함 "__all__" 일괄 처리를 의미함), 버튼을 비활성화하는 데 사용됩니다. + 원을 그리며 회전하다。
   const [rerunning, setRerunning] = React.useState<Set<string>>(new Set());
-  // 测试范围列表 + 新增表单状态。
+  // 테스트 범위 목록 + 양식 상태 추가。
   const [scope, setScope] = React.useState<TaskScopeRow[]>([]);
   const [scopeKind, setScopeKind] = React.useState<TaskScopeRow["kind"]>("root_domain");
   const [scopeValueInput, setScopeValueInput] = React.useState("");
   const [scopeBusy, setScopeBusy] = React.useState(false);
   const [scopeErr, setScopeErr] = React.useState("");
-  // 按模型的 token 用量（来自常开的 llm_usage 计量账本，逐次精确）。
+  // 모델별 token 복용량 (정상 개방 상태에서 llm_usage 언제나 정확한 측정 원장）。
   const [modelTokens, setModelTokens] = React.useState<ModelTokenStat[]>([]);
-  // 目标管理：目标列表 + 新增表单 + 行内编辑状态。
+  // 목표 관리: 목표 목록 + 양식 추가 + 인라인 편집 상태。
   const [goals, setGoals] = React.useState<TaskGoal[]>([]);
   const [goalText, setGoalText] = React.useState("");
   const [goalVuln, setGoalVuln] = React.useState("");
@@ -135,7 +135,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
   const [editingGoalId, setEditingGoalId] = React.useState<string | null>(null);
   const [editText, setEditText] = React.useState("");
   const [editVuln, setEditVuln] = React.useState("");
-  // 约束管理：约束列表 + 新增表单 + 行内编辑状态。
+  // 제약사항 관리: 제약사항 목록 + 양식 추가 + 인라인 편집 상태。
   const [constraints, setConstraints] = React.useState<TaskConstraint[]>([]);
   const [conText, setConText] = React.useState("");
   const [conKind, setConKind] = React.useState<TaskConstraint["kind"]>("deny");
@@ -150,7 +150,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.tokensByModel(taskId);
       setModelTokens(resp.models);
     } catch {
-      // 忽略：无 PG 时接口报错，卡片自然为空
+      // 무시: 없음 PG 인터페이스가 오류를 보고하면 카드는 자연스럽게 비어 있습니다.
     }
   }, [taskId]);
 
@@ -159,7 +159,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.taskScope(taskId);
       setScope(resp.scope);
     } catch {
-      // 忽略：无 asset store 时接口 503，范围卡片自然为空
+      // 무시: 없음 asset store 시간 인터페이스 503，범위 카드는 자연스럽게 비어 있습니다.
     }
   }, [taskId]);
 
@@ -168,7 +168,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.taskGoals(taskId);
       setGoals(resp.goals);
     } catch {
-      // 忽略：瞬时错误，下次轮询重试
+      // 무시: 일시적인 오류입니다. 다음 폴링을 다시 시도하세요.
     }
   }, [taskId]);
 
@@ -183,7 +183,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       setGoalVuln("");
       await loadGoals();
     } catch (e) {
-      setGoalErr(e instanceof Error ? e.message : "添加失败");
+      setGoalErr(e instanceof Error ? e.message : "추가 실패");
     } finally {
       setGoalBusy(false);
     }
@@ -211,7 +211,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       cancelEditGoal();
       await loadGoals();
     } catch (e) {
-      setGoalErr(e instanceof Error ? e.message : "保存失败");
+      setGoalErr(e instanceof Error ? e.message : "저장 실패");
     } finally {
       setGoalBusy(false);
     }
@@ -222,7 +222,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     try {
       await api.deleteGoal(taskId, g.id);
     } catch {
-      await loadGoals(); // 删除失败：重新拉取还原
+      await loadGoals(); // 삭제 실패: 복원하려면 다시 당기세요.
     }
   };
 
@@ -231,7 +231,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       const resp = await api.taskConstraints(taskId);
       setConstraints(resp.constraints);
     } catch {
-      // 忽略：瞬时错误，下次轮询重试
+      // 무시: 일시적인 오류입니다. 다음 폴링을 다시 시도하세요.
     }
   }, [taskId]);
 
@@ -245,7 +245,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       setConText("");
       await loadConstraints();
     } catch (e) {
-      setConErr(e instanceof Error ? e.message : "添加失败");
+      setConErr(e instanceof Error ? e.message : "추가 실패");
     } finally {
       setConBusy(false);
     }
@@ -273,7 +273,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       cancelEditConstraint();
       await loadConstraints();
     } catch (e) {
-      setConErr(e instanceof Error ? e.message : "保存失败");
+      setConErr(e instanceof Error ? e.message : "저장 실패");
     } finally {
       setConBusy(false);
     }
@@ -284,7 +284,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     try {
       await api.deleteConstraint(taskId, c.id);
     } catch {
-      await loadConstraints(); // 删除失败：重新拉取还原
+      await loadConstraints(); // 삭제 실패: 복원하려면 다시 당기세요.
     }
   };
 
@@ -298,7 +298,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       setScopeValueInput("");
       await loadScope();
     } catch (e) {
-      setScopeErr(e instanceof Error ? e.message : "添加失败");
+      setScopeErr(e instanceof Error ? e.message : "추가 실패");
     } finally {
       setScopeBusy(false);
     }
@@ -309,7 +309,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
     try {
       await api.deleteTaskScope(taskId, row.id);
     } catch {
-      await loadScope(); // 删除失败：重新拉取还原
+      await loadScope(); // 삭제 실패: 복원하려면 다시 당기세요.
     }
   };
 
@@ -321,20 +321,20 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       return next;
     });
 
-  // 重跑单条：置回 open（乐观更新本地 state，3s 轮询兜底），worker 会重新认领、从头再跑。
+  // 한 줄 다시 실행: 재설정 open（낙관적 업데이트 로컬 state，3s 투표），worker 다시 신청하고 처음부터 다시 실행합니다.。
   const rerunOne = async (id: string) => {
     markRerun(id, true);
     try {
       await api.rerunIntent(taskId, id);
       setIntents((prev) => prev.map((i) => (i.id === id ? { ...i, state: "open" } : i)));
     } catch {
-      // 失败忽略：下次轮询仍显示 blocked，用户可再点
+      // 실패 무시됨: 다음 폴링 시 계속 표시됩니다. blocked，사용자는 다시 클릭할 수 있습니다.
     } finally {
       markRerun(id, false);
     }
   };
 
-  // 批量重跑本任务全部 blocked。
+  // 모든 작업을 일괄적으로 다시 실행 blocked。
   const rerunAll = async () => {
     markRerun("__all__", true);
     try {
@@ -417,7 +417,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
   const blocked = intents.filter((i) => i.state === "blocked");
   const taskFindings = findings.filter((f) => f.task_id === taskId);
   const goalsPct = task?.goals_total ? Math.round(((task.goals_met ?? 0) / task.goals_total) * 100) : 0;
-  // token 合计（跨全部模型），用于卡片头部总览。
+  // token 카드 헤더 개요의 합계(모든 모델 전반)。
   const tokenTotals = modelTokens.reduce(
     (acc, m) => {
       acc.input += m.input_tokens;
@@ -432,41 +432,41 @@ export function OverviewTab({ taskId }: { taskId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 原始任务描述与目标(创建时填写的),置顶便于随时回看。 */}
+      {/* 원래 임무 설명 및 목표(생성시 입력),언제든지 다시 볼 수 있도록 상단에 고정해 두세요.。 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <TargetIcon className="size-4 text-primary" /> 任务描述与目标
+            <TargetIcon className="size-4 text-primary" /> 임무 설명 및 목표
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <div className="text-xs font-medium text-muted-foreground">描述</div>
+            <div className="text-xs font-medium text-muted-foreground">설명</div>
             <p className="text-sm whitespace-pre-wrap break-words">{task?.description?.trim() || "—"}</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <div className="text-xs font-medium text-muted-foreground">目标</div>
+            <div className="text-xs font-medium text-muted-foreground">목표</div>
             <p className="text-sm whitespace-pre-wrap break-words">{task?.goal?.trim() || "—"}</p>
           </div>
         </CardContent>
       </Card>
-      {/* 目标管理：查看/新增/修改/删除本任务的探索目标。新增与修改会通知规划者并复活任务，
-          删除仅通知规划者（不复活）。目标 = 最终可交付/可核验的结果，不是攻击步骤或侦察动作。 */}
+      {/* 목표관리: 보기/추가/개정하다/이 임무의 탐사 대상을 삭제하세요. 새로운 추가 및 수정사항은 기획자에게 통보되며 해당 작업은 부활됩니다.，
+          삭제는 플래너에게만 알립니다(부활은 아님). 목표 = 최종 결과물/공격 단계나 정찰 조치가 아닌 검증 가능한 결과。 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ListChecksIcon className="size-4 text-primary" /> 目标管理
+            <ListChecksIcon className="size-4 text-primary" /> 목표에 의한 관리
             <span className="text-muted-foreground text-xs font-normal">
-              （最终可核验的目标，共 {goals.length} 条；新增/修改会通知规划者并复活任务）
+              (궁극적으로 검증 가능한 목표, 총 {goals.length} 기사; 새로운 추가/수정 사항은 기획자에게 알리고 작업을 다시 시작합니다)
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* 新增表单 */}
+          {/* 양식 추가 */}
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="h-7 min-w-56 flex-1 text-sm"
-              placeholder="新增目标，如『拿到管理员账号的越权访问』"
+              placeholder="＂관리자 계정에 대한 무단 액세스 권한 획득＂과 같은 새로운 목표를 추가하세요."
               value={goalText}
               onChange={(e) => setGoalText(e.target.value)}
               onKeyDown={(e) => {
@@ -476,7 +476,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             />
             <Input
               className="h-7 w-32 text-sm"
-              placeholder="漏洞类(可选)"
+              placeholder="취약점 등급(선택 사항)"
               value={goalVuln}
               onChange={(e) => setGoalVuln(e.target.value)}
               onKeyDown={(e) => {
@@ -485,11 +485,11 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               disabled={goalBusy}
             />
             <Button size="sm" variant="outline" disabled={goalBusy || !goalText.trim()} onClick={() => void addGoal()}>
-              <PlusIcon className="size-3.5" /> 添加
+              <PlusIcon className="size-3.5" /> 추가
             </Button>
             {goalErr && <span className="text-xs text-red-500">{goalErr}</span>}
           </div>
-          {/* 目标列表 */}
+          {/* 대상 목록 */}
           {goals.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {goals.map((g) =>
@@ -508,7 +508,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                     />
                     <Input
                       className="h-7 w-32 text-sm"
-                      placeholder="漏洞类(可选)"
+                      placeholder="취약점 등급(선택 사항)"
                       value={editVuln}
                       onChange={(e) => setEditVuln(e.target.value)}
                       onKeyDown={(e) => {
@@ -568,36 +568,36 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               )}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无目标，添加后规划者会据此派发探索意图并判定达成。</p>
+            <p className="text-muted-foreground text-sm">아직 목표가 없습니다. 이를 추가한 후 기획자는 이에 따라 탐사 의도를 분배하고 달성 여부를 판단합니다.</p>
           )}
         </CardContent>
       </Card>
-      {/* 操作约束管理：allow=允许 / deny=禁止。约束会在下一轮规划时注入 planner/worker 的系统
-          提示以框定探索边界（注入范围可在 系统设置 里按 planner/worker 开关）。改动不即时打断，
-          下一轮规划自然读到。 */}
+      {/* 운영 제약 관리：allow=허용 / deny=금지하다. 다음 계획 단계에서 제약 조건이 주입됩니다. planner/worker 체계
+          탐색 경계 프레임을 지정하라는 메시지 표시(주입 범위는 시스템 설정에서 클릭할 수 있음) planner/worker 스위치). 변경 사항이 즉시 중단되지 않습니다.，
+          자연스럽게 다음 단계의 기획을 읽어보세요。 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldAlertIcon className="size-4 text-amber-500" /> 操作约束
+            <ShieldAlertIcon className="size-4 text-amber-500" /> 운영상의 제약
             <span className="text-muted-foreground text-xs font-normal">
-              （框定 planner/worker 的探索边界，共 {constraints.length} 条；改动下一轮规划生效）
+              (planner/worker의 탐색 경계를 프레임으로 설정, 총 {constraints.length} 기사; 다음 계획 단계의 변경 사항이 적용됩니다)
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* 新增表单 */}
+          {/* 양식 추가 */}
           <div className="flex flex-wrap items-center gap-2">
             <NativeSelect
               size="sm"
               value={conKind}
               onChange={(e) => setConKind(e.target.value as TaskConstraint["kind"])}
             >
-              <NativeSelectOption value="deny">禁止</NativeSelectOption>
-              <NativeSelectOption value="allow">允许</NativeSelectOption>
+              <NativeSelectOption value="deny">금지하다</NativeSelectOption>
+              <NativeSelectOption value="allow">허용</NativeSelectOption>
             </NativeSelect>
             <Input
               className="h-7 min-w-56 flex-1 text-sm"
-              placeholder="一条操作约束，如『仅测当前端口，不扫其他端口』"
+              placeholder="＂현재 포트만 테스트하고 다른 포트는 스캔하지 않음＂과 같은 작업 제약"
               value={conText}
               onChange={(e) => setConText(e.target.value)}
               onKeyDown={(e) => {
@@ -611,11 +611,11 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               disabled={conBusy || !conText.trim()}
               onClick={() => void addConstraint()}
             >
-              <PlusIcon className="size-3.5" /> 添加
+              <PlusIcon className="size-3.5" /> 추가
             </Button>
             {conErr && <span className="text-xs text-red-500">{conErr}</span>}
           </div>
-          {/* 约束列表 */}
+          {/* 제약사항 목록 */}
           {constraints.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {constraints.map((c) =>
@@ -626,8 +626,8 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                       value={editConKind}
                       onChange={(e) => setEditConKind(e.target.value as TaskConstraint["kind"])}
                     >
-                      <NativeSelectOption value="deny">禁止</NativeSelectOption>
-                      <NativeSelectOption value="allow">允许</NativeSelectOption>
+                      <NativeSelectOption value="deny">금지하다</NativeSelectOption>
+                      <NativeSelectOption value="allow">허용</NativeSelectOption>
                     </NativeSelect>
                     <Input
                       className="h-7 min-w-56 flex-1 text-sm"
@@ -668,7 +668,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                           : "bg-red-500/15 text-red-600 dark:text-red-400"
                       }`}
                     >
-                      {c.kind === "allow" ? "允许" : "禁止"}
+                      {c.kind === "allow" ? "허용" : "금지하다"}
                     </span>
                     <span className="min-w-0 flex-1 break-words">{c.text}</span>
                     <Button
@@ -695,7 +695,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">
-              暂无操作约束。建任务时会自动从描述/目标抽取；也可在此手动增删改，用来框定「允许/禁止做哪些操作」。
+              현재 운영상의 제약은 없습니다. 작업을 생성하면 설명/목표에서 자동으로 추출됩니다. 여기에서 수동으로 추가, 삭제, 수정하여 "허용/금지되는 작업"을 정의할 수도 있습니다.
             </p>
           )}
         </CardContent>
@@ -705,8 +705,8 @@ export function OverviewTab({ taskId }: { taskId: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <TargetIcon className="size-4 text-emerald-500" /> 资产测试覆盖度
-              <span className="text-muted-foreground text-xs font-normal">（粗估，仅供参考）</span>
+              <TargetIcon className="size-4 text-emerald-500" /> 자산 테스트 범위
+              <span className="text-muted-foreground text-xs font-normal">(대략적인 추정치, 참고용)</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -715,7 +715,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                 {coverage.pct != null ? Math.round(coverage.pct * 100) + "%" : "—"}
               </span>
               <span className="text-muted-foreground text-sm">
-                已测 {coverage.tested} / 范围内 {coverage.denominator}
+                테스트됨 {coverage.tested} / 범위 내 {coverage.denominator}
               </span>
             </div>
             {coverage.pct != null && <Progress value={Math.round(coverage.pct * 100)} />}
@@ -734,51 +734,51 @@ export function OverviewTab({ taskId }: { taskId: string }) {
           </CardContent>
         </Card>
       )}
-      {/* LLM Token 用量：按模型分组，数据来自 llm_records（需开启 LLM 录制）。 */}
+      {/* LLM Token 사용법: 모델별로 그룹화, 데이터 llm_records（켜야 함 LLM 기록）。 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <CoinsIcon className="size-4 text-amber-500" /> LLM Token 用量
+            <CoinsIcon className="size-4 text-amber-500" /> LLM Token 복용량
             <span className="text-muted-foreground text-xs font-normal">
-              （按模型统计{tokenTotals.calls > 0 ? `，共 ${tokenTotals.calls} 次调用` : ""}）
+              (모델별 통계{tokenTotals.calls > 0 ? `, 총 ${tokenTotals.calls} 호출` : ""}）
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {modelTokens.length > 0 ? (
             <>
-              {/* 合计总览 */}
+              {/* 전체 개요 */}
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">输入 </span>
+                  <span className="text-muted-foreground">입력하다 </span>
                   <span className="font-semibold">{fmtTokens(tokenTotals.input)}</span>
                 </span>
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">输出 </span>
+                  <span className="text-muted-foreground">산출 </span>
                   <span className="font-semibold">{fmtTokens(tokenTotals.output)}</span>
                 </span>
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">缓存读 </span>
+                  <span className="text-muted-foreground">캐시 읽기 </span>
                   <span className="font-semibold">{fmtTokens(tokenTotals.cacheRead)}</span>
                 </span>
                 <span className="tabular-nums">
-                  <span className="text-muted-foreground">缓存命中率 </span>
+                  <span className="text-muted-foreground">캐시 적중률 </span>
                   <span className="font-semibold text-emerald-500">
                     {cacheHitRate(tokenTotals.cacheRead, tokenTotals.input)}
                   </span>
                 </span>
               </div>
-              {/* 按模型明细表 */}
+              {/* 모델별 일정 */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-muted-foreground border-b text-left text-xs">
-                      <th className="py-1.5 pr-3 font-medium">模型</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">调用</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">输入</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">输出</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">缓存读</th>
-                      <th className="py-1.5 text-right font-medium">命中率</th>
+                      <th className="py-1.5 pr-3 font-medium">모델</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">부르다</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">입력하다</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">산출</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">캐시 읽기</th>
+                      <th className="py-1.5 text-right font-medium">적중률</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -801,48 +801,48 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               </div>
             </>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无 LLM 用量（任务尚未产生调用，或记录仍在写入）。</p>
+            <p className="text-muted-foreground text-sm">현재 LLM는 사용되지 않습니다(작업이 아직 호출을 생성하지 않았거나 기록이 아직 기록 중임).</p>
           )}
         </CardContent>
       </Card>
-      {/* 测试范围：覆盖度分母 + 授权边界，可手动增删。 */}
+      {/* 테스트 범위: 적용 범위 분모 + 승인 경계를 수동으로 추가하거나 삭제할 수 있습니다.。 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheckIcon className="size-4 text-emerald-500" /> 测试范围
+            <ShieldCheckIcon className="size-4 text-emerald-500" /> 테스트 범위
             <span className="text-muted-foreground text-xs font-normal">
-              （覆盖度分母 + 授权边界，共 {scope.length} 条）
+              (커버리지 산정 기준 및 승인 범위, 총 {scope.length}개)
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* 新增表单 */}
+          {/* 양식 추가 */}
           <div className="flex flex-wrap items-center gap-2">
             <NativeSelect
               size="sm"
               value={scopeKind}
               onChange={(e) => setScopeKind(e.target.value as TaskScopeRow["kind"])}
             >
-              <NativeSelectOption value="root_domain">根域名</NativeSelectOption>
-              <NativeSelectOption value="subdomain">子域名</NativeSelectOption>
+              <NativeSelectOption value="root_domain">루트 도메인 이름</NativeSelectOption>
+              <NativeSelectOption value="subdomain">하위 도메인</NativeSelectOption>
               <NativeSelectOption value="ip">IP</NativeSelectOption>
-              <NativeSelectOption value="cidr">网段</NativeSelectOption>
+              <NativeSelectOption value="cidr">네트워크 세그먼트</NativeSelectOption>
               <NativeSelectOption value="icp">ICP</NativeSelectOption>
-              <NativeSelectOption value="keyword">关键词</NativeSelectOption>
-              <NativeSelectOption value="company">公司</NativeSelectOption>
+              <NativeSelectOption value="keyword">키워드</NativeSelectOption>
+              <NativeSelectOption value="company">회사</NativeSelectOption>
             </NativeSelect>
             <Input
               className="h-7 w-56 text-sm"
               placeholder={
                 scopeKind === "company"
-                  ? "公司名或 id"
+                  ? "회사명 또는 id"
                   : scopeKind === "ip" || scopeKind === "cidr"
-                    ? "如 10.0.0.1 或 10.0.0.0/24"
+                    ? "예: 10.0.0.1 또는 10.0.0.0/24"
                     : scopeKind === "icp"
-                      ? "如 京ICP备12345678号-1"
+                      ? "베이징 ICP 번호 12345678-1과 같은"
                       : scopeKind === "keyword"
-                        ? "如 企业名称关键词"
-                        : "如 example.com"
+                        ? "회사명 키워드 등"
+                        : "example.com와 같은"
               }
               value={scopeValueInput}
               onChange={(e) => setScopeValueInput(e.target.value)}
@@ -857,11 +857,11 @@ export function OverviewTab({ taskId }: { taskId: string }) {
               disabled={scopeBusy || !scopeValueInput.trim()}
               onClick={() => void addScope()}
             >
-              <PlusIcon className="size-3.5" /> 添加
+              <PlusIcon className="size-3.5" /> 추가
             </Button>
             {scopeErr && <span className="text-xs text-red-500">{scopeErr}</span>}
           </div>
-          {/* 范围列表 */}
+          {/* 범위 목록 */}
           {scope.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {scope.map((row) => (
@@ -881,13 +881,13 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                       <Trash2Icon className="size-3.5 text-red-500" />
                     </Button>
                   ) : (
-                    <span className="text-muted-foreground shrink-0 text-xs">继承</span>
+                    <span className="text-muted-foreground shrink-0 text-xs">상속하다</span>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无测试范围，添加后可作为资产覆盖度的分母。</p>
+            <p className="text-muted-foreground text-sm">현재 테스트 범위가 없습니다. 추가한 후 자산 커버리지의 분모로 사용할 수 있습니다.</p>
           )}
         </CardContent>
       </Card>
@@ -895,12 +895,12 @@ export function OverviewTab({ taskId }: { taskId: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ActivityIcon className="size-4 text-blue-500" /> 心跳
+            <ActivityIcon className="size-4 text-blue-500" /> 심장 박동
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <div className="text-xs text-muted-foreground">引擎态</div>
+            <div className="text-xs text-muted-foreground">엔진 상태</div>
             <StatusBadge
               domain="engine"
               value={stats?.engine_mode ?? task?.engine_mode ?? "idle"}
@@ -909,28 +909,28 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">运行中 Worker</div>
+            <div className="text-xs text-muted-foreground">Worker 실행</div>
             <div className="mt-1 text-lg font-semibold tabular-nums">{running.length}</div>
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">最近活动</div>
+            <div className="text-xs text-muted-foreground">최근 활동</div>
             <div className="mt-1 inline-flex items-center gap-1 text-sm">
               <ClockIcon className="size-3.5" />
-              {task?.last_activity ? new Date(task.last_activity).toLocaleTimeString("zh-CN") : "—"}
+              {task?.last_activity ? new Date(task.last_activity).toLocaleTimeString("ko-KR") : "—"}
             </div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">
-              目标 {task?.goals_met ?? 0}/{task?.goals_total ?? 0}
+              목표 {task?.goals_met ?? 0}/{task?.goals_total ?? 0}
             </div>
             <Progress value={goalsPct} className="mt-2" />
           </div>
           {task?.completed_unix && task.completed_unix > 0 ? (
             <div>
-              <div className="text-xs text-muted-foreground">完成时间</div>
+              <div className="text-xs text-muted-foreground">완료 시간</div>
               <div className="mt-1 inline-flex items-center gap-1 text-sm">
                 <ClockIcon className="size-3.5" />
-                {new Date(task.completed_unix * 1000).toLocaleString("zh-CN")}
+                {new Date(task.completed_unix * 1000).toLocaleString("ko-KR")}
               </div>
             </div>
           ) : null}
@@ -942,7 +942,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <TargetIcon className="size-4" /> 进行中意图
+              <TargetIcon className="size-4" /> 지속적인 의도
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -952,32 +952,32 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                 <span className="min-w-0 flex-1 truncate">{i.payload}</span>
               </div>
             ))}
-            {running.length === 0 && <p className="text-sm text-muted-foreground">暂无进行中意图</p>}
+            {running.length === 0 && <p className="text-sm text-muted-foreground">진행중인 계획은 없습니다</p>}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <AlertTriangleIcon className="size-4 text-amber-500" /> 需要关注
+              <AlertTriangleIcon className="size-4 text-amber-500" /> 주의가 필요하다
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <div className="text-2xl font-semibold tabular-nums text-red-600">{taskFindings.length}</div>
-              <div className="text-xs text-muted-foreground">确认漏洞</div>
+              <div className="text-xs text-muted-foreground">취약점 확인</div>
             </div>
             <div>
               <div className="text-2xl font-semibold tabular-nums text-blue-600">{running.length}</div>
-              <div className="text-xs text-muted-foreground">执行中</div>
+              <div className="text-xs text-muted-foreground">실행 중</div>
             </div>
             <div>
               <div className="text-2xl font-semibold tabular-nums">{open.length}</div>
-              <div className="text-xs text-muted-foreground">frontier 待领</div>
+              <div className="text-xs text-muted-foreground">frontier 수집 예정</div>
             </div>
             <div>
               <div className="text-2xl font-semibold tabular-nums text-red-600">{blocked.length}</div>
-              <div className="text-xs text-muted-foreground">被拦意图</div>
+              <div className="text-xs text-muted-foreground">중지하려는 의도</div>
             </div>
           </CardContent>
         </Card>
@@ -985,7 +985,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <BugIcon className="size-4 text-red-500" /> 最近发现
+              <BugIcon className="size-4 text-red-500" /> 최근에 발견된
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -995,23 +995,23 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                 <span className="min-w-0 flex-1 truncate">{f.summary}</span>
               </div>
             ))}
-            {taskFindings.length === 0 && <p className="text-sm text-muted-foreground">暂无发现</p>}
+            {taskFindings.length === 0 && <p className="text-sm text-muted-foreground">아직 발견되지 않았습니다.</p>}
           </CardContent>
         </Card>
       </div>
 
-      {/* Blocked intents — 出错/被拦(如 LLM 网络问题)的意图，可一键重跑：置回 open，
-          worker 会重新认领、从头再跑（已写回图谱的数据保留）；任务若已终态/暂停会自动复活。 */}
+      {/* Blocked intents — 오류/중지되었습니다(좋다 LLM 네트워크 문제)의도, 한 번의 클릭으로 다시 실행할 수 있습니다: 재설정 open，
+          worker 다시 요청하고 다시 실행합니다(지도에 다시 기록된 데이터는 유지됩니다). 작업이 종료된 경우/일시중지하면 자동으로 부활합니다.。 */}
       {blocked.length > 0 && (
         <Card className="border-red-500/30">
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="flex items-center gap-2 text-sm">
-              <AlertTriangleIcon className="size-4 text-red-500" /> 被拦/出错意图
-              <span className="text-xs font-normal text-muted-foreground">（共 {blocked.length} 条，可重跑）</span>
+              <AlertTriangleIcon className="size-4 text-red-500" /> 차단/잘못된 의도
+              <span className="text-xs font-normal text-muted-foreground">(총 {blocked.length}건, 재실행 가능)</span>
             </CardTitle>
             <Button size="sm" variant="outline" disabled={rerunning.has("__all__")} onClick={() => void rerunAll()}>
               <RefreshCwIcon className={`size-3.5 ${rerunning.has("__all__") ? "animate-spin" : ""}`} />
-              全部重跑
+              모든 재방송
             </Button>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -1027,13 +1027,13 @@ export function OverviewTab({ taskId }: { taskId: string }) {
                   onClick={() => void rerunOne(i.id)}
                 >
                   <RefreshCwIcon className={`size-3 ${rerunning.has(i.id) ? "animate-spin" : ""}`} />
-                  重跑
+                  재방송
                 </Button>
               </div>
             ))}
             {blocked.length > 20 && (
               <p className="text-xs text-muted-foreground">
-                仅显示前 20 条，点「全部重跑」处理剩余 {blocked.length - 20} 条。
+                처음 20건만 표시됩니다. "모두 다시 실행"을 누르면 나머지 {blocked.length - 20}건도 처리됩니다.
               </p>
             )}
           </CardContent>
@@ -1042,30 +1042,30 @@ export function OverviewTab({ taskId }: { taskId: string }) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard label="待领意图" value={open.length} icon={ShieldCheckIcon} sub="frontier 开放" />
-        <StatCard label="确认发现" value={taskFindings.length} icon={BugIcon} sub="本任务" />
-        <StatCard label="意图总数" value={intents.length} icon={AlertTriangleIcon} sub="本任务全部意图" />
+        <StatCard label="받을 의사" value={open.length} icon={ShieldCheckIcon} sub="frontier 열기" />
+        <StatCard label="결과를 확인하다" value={taskFindings.length} icon={BugIcon} sub="이 작업" />
+        <StatCard label="총 인텐트 수" value={intents.length} icon={AlertTriangleIcon} sub="이번 임무의 모든 의도" />
       </div>
     </div>
   );
 }
 
 const TASK_RULE_KIND_OPTIONS: { value: AssetInterceptKind; label: string; placeholder: string }[] = [
-  { value: "exact_domain", label: "域名(全等)", placeholder: "example.gov.cn" },
-  { value: "exact_ip", label: "IP(全等)", placeholder: "203.0.113.10" },
-  { value: "exact_url", label: "URL(全等)", placeholder: "https://example.com/login" },
-  { value: "fuzzy_domain", label: "域名(模糊)", placeholder: ".gov.cn" },
-  { value: "fuzzy_ip", label: "IP(模糊)", placeholder: "203.0.113." },
-  { value: "fuzzy_url", label: "URL(模糊)", placeholder: "/admin" },
-  { value: "cidr", label: "CIDR 网段", placeholder: "192.168.0.0/16" },
+  { value: "exact_domain", label: "도메인 이름(일치)", placeholder: "example.gov.cn" },
+  { value: "exact_ip", label: "IP(합동)", placeholder: "203.0.113.10" },
+  { value: "exact_url", label: "URL(합동)", placeholder: "https://example.com/login" },
+  { value: "fuzzy_domain", label: "도메인 이름(퍼지)", placeholder: ".gov.cn" },
+  { value: "fuzzy_ip", label: "IP(퍼지)", placeholder: "203.0.113." },
+  { value: "fuzzy_url", label: "URL(퍼지)", placeholder: "/admin" },
+  { value: "cidr", label: "CIDR 네트워크 세그먼트", placeholder: "192.168.0.0/16" },
 ];
 
 const TASK_RULE_KIND_LABEL: Record<AssetInterceptKind, string> = Object.fromEntries(
   TASK_RULE_KIND_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<AssetInterceptKind, string>;
 
-// TaskInterceptRulesCard 在任务详情总览里管理「任务级资产拦截 / 允许规则」：
-// 列表 + 新增 + 行内编辑 + 删除 + 启用开关。规则仅本任务生效，不进全局表。
+// TaskInterceptRulesCard 작업 세부정보 개요에서 관리「작업 수준 자산 차단 / 허용 규칙」：
+// 목록 + 추가 + 인라인 편집 + 삭제 + 스위치를 활성화합니다. 규칙은 이 작업에만 적용되며 전역 테이블에 입력되지 않습니다.。
 function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
   const [rules, setRules] = React.useState<AssetInterceptRule[]>([]);
   const [busy, setBusy] = React.useState(false);
@@ -1084,7 +1084,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
     try {
       setRules(await api.taskInterceptRules(taskId));
     } catch {
-      // 忽略瞬时错误
+      // 일시적인 오류 무시
     }
   }, [taskId]);
 
@@ -1168,18 +1168,18 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldCheckIcon className="size-4 text-sky-500" /> 任务级资产拦截 / 允许
+          <ShieldCheckIcon className="size-4 text-sky-500" /> 작업 수준 자산 차단/허용
           <span className="text-muted-foreground text-xs font-normal">
-            （仅本任务生效，不进全局；先拦截后允许，共 {rules.length} 条）
+            (이 작업에만 적용되며 전체 탐색 맥락에는 포함되지 않습니다. 차단 규칙이 허용 규칙보다 우선합니다. 총 {rules.length}개)
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {/* 新增表单 */}
+        {/* 양식 추가 */}
         <div className="flex flex-wrap items-center gap-2">
           <NativeSelect size="sm" value={newAction} onChange={(e) => setNewAction(e.target.value as "block" | "allow")}>
-            <NativeSelectOption value="block">拦截</NativeSelectOption>
-            <NativeSelectOption value="allow">允许</NativeSelectOption>
+            <NativeSelectOption value="block">차단</NativeSelectOption>
+            <NativeSelectOption value="allow">허용</NativeSelectOption>
           </NativeSelect>
           <NativeSelect size="sm" value={newKind} onChange={(e) => setNewKind(e.target.value as AssetInterceptKind)}>
             {TASK_RULE_KIND_OPTIONS.map((o) => (
@@ -1200,17 +1200,17 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
           />
           <Input
             className="h-7 w-36 text-sm"
-            placeholder="备注(可选)"
+            placeholder="비고(선택사항)"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
             disabled={busy}
           />
           <Button size="sm" variant="outline" disabled={busy || !newPattern.trim()} onClick={() => void add()}>
-            <PlusIcon className="size-3.5" /> 添加
+            <PlusIcon className="size-3.5" /> 추가
           </Button>
           {err && <span className="text-xs text-red-500">{err}</span>}
         </div>
-        {/* 规则列表 */}
+        {/* 규칙 목록 */}
         {rules.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             {rules.map((r) =>
@@ -1221,8 +1221,8 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
                     value={editAction}
                     onChange={(e) => setEditAction(e.target.value as "block" | "allow")}
                   >
-                    <NativeSelectOption value="block">拦截</NativeSelectOption>
-                    <NativeSelectOption value="allow">允许</NativeSelectOption>
+                    <NativeSelectOption value="block">차단</NativeSelectOption>
+                    <NativeSelectOption value="allow">허용</NativeSelectOption>
                   </NativeSelect>
                   <NativeSelect
                     size="sm"
@@ -1248,7 +1248,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
                   />
                   <Input
                     className="h-7 w-36 text-sm"
-                    placeholder="备注(可选)"
+                    placeholder="비고(선택사항)"
                     value={editNote}
                     onChange={(e) => setEditNote(e.target.value)}
                     disabled={busy}
@@ -1281,7 +1281,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
                         : "bg-red-500/15 text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {r.action === "allow" ? "允许" : "拦截"}
+                    {r.action === "allow" ? "허용" : "차단"}
                   </span>
                   <span className="text-muted-foreground shrink-0 text-xs">{TASK_RULE_KIND_LABEL[r.kind]}</span>
                   <code className="bg-muted min-w-0 flex-1 truncate rounded px-1.5 py-0.5 text-xs">{r.pattern}</code>
@@ -1313,7 +1313,7 @@ function TaskInterceptRulesCard({ taskId }: { taskId: string }) {
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            暂无任务级规则。「拦截」命中即禁止测试；「允许」为白名单——配置后本任务只允许命中允许规则的资产（未配置则不启用白名单）。
+            아직 작업 수준 규칙이 없습니다. "Intercept"가 명중되면 테스트가 금지됩니다. "허용"은 화이트리스트입니다. 구성 후 이 작업은 허용된 규칙에 맞는 자산만 허용합니다(구성되지 않은 경우 화이트리스트가 활성화되지 않습니다).
           </p>
         )}
       </CardContent>

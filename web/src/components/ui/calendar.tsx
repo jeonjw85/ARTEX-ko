@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { ko } from "react-day-picker/locale"
 import {
   DayPicker,
   getDefaultClassNames,
@@ -18,7 +19,7 @@ function Calendar({
   showOutsideDays = true,
   captionLayout = "label",
   buttonVariant = "ghost",
-  locale,
+  locale = ko,
   formatters,
   components,
   ...props

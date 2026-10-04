@@ -13,8 +13,8 @@ import (
 	actool "github.com/Autumn-27/norma/tool"
 )
 
-// assetInterceptCandidates 提取一条待插入资产输入项的 域名/IP/URL 候选串，用于资产拦截匹配。
-// URL 的 host 会拆出归类，使「只带 URL」的服务/端点资产也能被 域名/IP 规则命中。
+// assetInterceptCandidates는 삽입할 자산 입력 항목의 도메인 이름/IP/URL 후보 문자열을 추출하며, 이는 자산 가로채기 및 매칭에 사용됩니다.
+// URL의 host는 분류되지 않으므로 "URL 전용"이 있는 서비스/엔드포인트 자산도 도메인 이름/IP 규칙에 의해 적중될 수 있습니다.
 func assetInterceptCandidates(item assetInputItem) (domains, ips, urls []string) {
 	add := func(dst *[]string, s string) {
 		if s = strings.TrimSpace(s); s != "" {
@@ -42,7 +42,7 @@ func assetInterceptCandidates(item assetInputItem) (domains, ips, urls []string)
 	return domains, ips, urls
 }
 
-// assetInputLabel 返回一条待插入资产的简短标识，用于拦截说明消息。
+// assetInputLabel는 설명 메시지를 가로채는 데 사용되는 삽입할 자산의 짧은 ID를 반환합니다.
 func assetInputLabel(item assetInputItem) string {
 	typ := strings.TrimSpace(item.Type)
 	var target string
@@ -56,7 +56,7 @@ func assetInputLabel(item assetInputItem) string {
 	case strings.TrimSpace(item.ServiceIP) != "":
 		target = strings.TrimSpace(item.ServiceIP)
 	default:
-		target = "(未知)"
+		target = "(알려지지 않은)"
 	}
 	if typ != "" {
 		return fmt.Sprintf("[%s] %s", typ, target)
@@ -122,79 +122,79 @@ type assetInputItem struct {
 func (t *ToolSet) insertAssets() actool.CoreTool {
 	return writeTool(
 		"insert_assets",
-		"批量登记新发现的资产，一次可混合多种类型（type 见枚举）。\n"+
-			"各类型必填字段：root_domain→domain；ip→ip（须为 IPv4/IPv6，非主机名）；subdomain→domain；app→app_name；service(HTTP)→url；service(非HTTP)→service_name+port（ip/domain 至少填一个）；endpoint→url+method。其余字段含义见各自说明。\n"+
-			"auth/technologies/params 为追加合并(append)，不覆盖原值。\n"+
-			"返回：{results:[{index,id,type}], errors:[{index,error}]}",
+		"새로 발견된 자산을 일괄 등록하여 여러 유형을 한 번에 혼합합니다(type 열거 참조). \n"+
+			"유형별 필수 입력사항：root_domain→domain；ip→ip（반드시 IPv4/IPv6，호스트 이름이 아닌 이름）；subdomain→domain；app→app_name；service(HTTP)→url；service(아니요HTTP)→service_name+port（ip/domain 하나 이상 입력하세요.）；endpoint→url+method。다른 필드의 의미는 해당 설명을 참조하세요.。\n"+
+			"auth/technologies/params는 추가 병합(append)이며 원래 값을 덮어쓰지 않습니다. \n"+
+			"반환: {results:[{index,id,type}], errors:[{index,error}]}",
 		obj(map[string]any{
-			// task_id 不暴露给模型：worker 归属哪个 task 由程序经 SetTaskID 权威赋值(见 handler)。
+			// task_id는 모델에 노출되지 않습니다. worker는 task가 SetTaskID를 통해 프로그램에 의해 정식으로 할당된 모델에 속합니다(handler 참조).
 			"assets": map[string]any{
 				"type":        "array",
-				"description": "资产数组，每个元素对应一条资产记录",
+				"description": "자산 배열, 각 요소는 자산 기록에 해당합니다.",
 				"items": obj(map[string]any{
 					"type": map[string]any{
 						"type":        "string",
 						"enum":        []string{"root_domain", "ip", "subdomain", "app", "service", "endpoint"},
-						"description": "资产类型",
+						"description": "자산 유형",
 					},
 					// root_domain / subdomain
-					"domain":      str("根域名或子域名（root_domain/subdomain 必填）"),
-					"icp":         str("ICP 备案号（可选）"),
-					"record_type": str("DNS 解析类型：A/AAAA/CNAME/MX 等（subdomain 可选）"),
+					"domain":      str("루트 도메인 이름 또는 하위 도메인 이름(root_domain/subdomain 필요)"),
+					"icp":         str("ICP 등록번호(선택)"),
+					"record_type": str("DNS 분석 유형: A/AAAA/CNAME/MX 등(subdomain 옵션)"),
 					"record_value": map[string]any{
 						"type":        "array",
 						"items":       map[string]any{"type": "string"},
-						"description": "DNS 解析值列表（subdomain 可选，如 [\"1.2.3.4\",\"2.3.4.5\"]）",
+						"description": "DNS 구문 분석된 값 목록(subdomain는 선택 사항입니다. 예: [\"1.2.3.4\",\"2.3.4.5\"])",
 					},
 					// ip
-					"ip": str("IP 地址，必须是 IPv4/IPv6 地址，不能填主机名（主机名请用 type=subdomain 的 domain 字段）；ip 类型必填；service/endpoint 类型可填，用于关联 IP"),
+					"ip": str("IP 주소는 IPv4/IPv6 주소여야 하며 호스트 이름은 입력할 수 없습니다(호스트 이름의 경우 type=subdomain의 domain 필드를 사용하십시오). ip 유형이 필요합니다. service/endpoint 유형은 선택 사항이며 IP를 연결하는 데 사용됩니다."),
 					"bound_domains": map[string]any{
 						"type":        "array",
 						"items":       map[string]any{"type": "string"},
-						"description": "该 IP 绑定的域名列表（ip 类型可选）",
+						"description": "이 IP에 바인딩된 도메인 이름 목록(ip 유형은 선택 사항)",
 					},
 					"open_ports": map[string]any{
 						"type":        "array",
-						"description": "开放端口列表（ip 类型可选）",
+						"description": "오픈 포트 목록(ip 유형은 옵션)",
 						"items": obj(map[string]any{
-							"port":    intp("端口号"),
-							"service": str("服务名称，如 http/ssh/mysql 等（可选）"),
+							"port":    intp("포트 번호"),
+							"service": str("http/ssh/mysql 등의 서비스 이름(선택 사항)"),
 						}, "port"),
 					},
 					// app
-					"app_name":    str("应用名称（app 类型必填）"),
-					"bundle_id":   str("Bundle ID（app 类型可选）"),
-					"category":    str("应用分类（可选）"),
-					"description": str("应用描述（可选）"),
-					"app_icp":     str("应用 ICP 备案（可选）"),
-					"company_id":  intp("归属企业 id（app 类型可选；app 无法靠 scope 自动归因，需显式指定。id 由 add_company_scope 返回）"),
+					"app_name":    str("애플리케이션 이름(app 유형에 필수)"),
+					"bundle_id":   str("Bundle ID (app 유형 옵션)"),
+					"category":    str("애플리케이션 분류(선택)"),
+					"description": str("애플리케이션 설명(선택사항)"),
+					"app_icp":     str("ICP 등록 신청(선택)"),
+					"company_id":  intp("기업 id 귀속(app 유형은 선택 사항입니다. app는 scope에 의해 자동으로 귀속될 수 없으며 명시적으로 지정해야 합니다. id는 add_company_scope에 의해 반환됩니다.)"),
 					// service (http)
-					"url":         str("完整 URL，含协议和端口（HTTP 服务必填；service_type 自动设为 http）"),
-					"status_code": intp("HTTP 响应状态码，如 200/301/403/404（可选）"),
+					"url":         str("프로토콜 및 포트를 포함한 전체 URL(HTTP 서비스가 필요하며 service_type는 자동으로 http로 설정됨)"),
+					"status_code": intp("HTTP 응답 상태 코드(예: 200/301/403/404)(선택 사항)"),
 					"content_length": map[string]any{
 						"type":        "integer",
-						"description": "HTTP 响应体字节数（可选）",
+						"description": "HTTP 응답 본문 바이트 수(선택 사항)",
 					},
-					"page_title":   str("页面 <title> 内容（可选）"),
-					"favicon_mmh3": str("favicon MMH3 哈希（可选）"),
+					"page_title":   str("페이지 <title> 콘텐츠(선택 사항)"),
+					"favicon_mmh3": str("favicon MMH3 해시(선택 사항)"),
 					"technologies": map[string]any{
 						"type":        "array",
 						"items":       map[string]any{"type": "string"},
-						"description": "指纹/技术栈列表，如 [\"Nginx\",\"Vue\",\"Bootstrap\"]（可选）",
+						"description": "지문/기술 스택 목록(예: [\"Nginx\",\"Vue\",\"Bootstrap\"](선택 사항)",
 					},
 					"auth": map[string]any{
 						"type":        "array",
-						"description": "发现的认证信息列表，每条含 type/username/password 等字段（可选，追加不覆盖）",
+						"description": "각각 type/username/password 및 기타 필드를 포함하는 검색된 인증 정보 목록(선택 사항, 추가 시 포함되지 않음)",
 						"items":       map[string]any{"type": "object"},
 					},
-					// service (other，非 HTTP)
-					"service_name": str("服务名称，如 ssh/mysql/redis（service 非 HTTP 时必填）"),
-					"port":         intp("端口号（service 非 HTTP 时必填）"),
+					// service(other, HTTP 아님)
+					"service_name": str("ssh/mysql/redis와 같은 서비스 이름(service가 HTTP가 아닌 경우 필수)"),
+					"port":         intp("포트 번호(service가 HTTP가 아닌 경우 필수)"),
 					// endpoint
-					"method": str("HTTP 方法：GET/POST/PUT/PATCH/DELETE 等（endpoint 必填）"),
+					"method": str("HTTP 방법: GET/POST/PUT/PATCH/DELETE 등 (endpoint 필요)"),
 					"params": map[string]any{
 						"type":        "array",
-						"description": "请求参数列表，每条含 location(query/body/header/path)/name/value/type（可选，追加不覆盖）",
+						"description": "각각 location(query/body/header/path)/name/value/type를 포함하는 요청 매개변수 목록(선택사항, 추가 시 포함되지 않음)",
 						"items":       map[string]any{"type": "object"},
 					},
 				}, "type"),
@@ -202,7 +202,7 @@ func (t *ToolSet) insertAssets() actool.CoreTool {
 		}, "assets"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			if t.as == nil {
-				return actool.Errorf("insert_assets 未启用: AssetStore 未初始化"), nil
+				return actool.Errorf("insert_assets가 활성화되지 않음: AssetStore가 초기화되지 않음"), nil
 			}
 			var a struct {
 				Assets []assetInputItem `json:"assets"`
@@ -210,8 +210,8 @@ func (t *ToolSet) insertAssets() actool.CoreTool {
 			if err := json.Unmarshal(in, &a); err != nil {
 				return actool.Errorf("invalid input: " + err.Error()), nil
 			}
-			// task_id 由程序权威赋值(worker: SetTaskID)，不接受模型传入——避免模型漏传/错传
-			// 导致资产未归任务或归错任务。无任务上下文的调用方(auto/pentest/chat)其 t.taskID=0。
+			// task_id는 프로그램(worker: SetTaskID)에 의해 정식으로 할당되었으며 모델이 허용되지 않습니다. - 모델 누락/잘못 전송을 방지하기 위해
+			// 결과적으로 자산이 작업에 할당되지 않거나 잘못된 작업에 할당됩니다. 작업 컨텍스트가 없는 호출자(auto/pentest/chat)는 t.taskID=0입니다.
 			taskID := t.taskID
 
 			type result struct {
@@ -227,8 +227,8 @@ func (t *ToolSet) insertAssets() actool.CoreTool {
 			var results []result
 			var errs []errEntry
 
-			// 资产闸门规则一次性载入；读取失败则跳过判定（不阻断插入）。
-			// 拦截规则 = 全局 ∪ 任务级 block；允许规则 = 任务级 allow。
+			// 자산 게이트 규칙은 한 번 로드됩니다. 판독에 실패하면 판정을 건너뜁니다(삽입이 차단되지 않음).
+			// 차단 규칙 = 전역 ∪ 작업 수준 block; 허용 규칙 = 작업 수준 allow.
 			blockRules, _ := t.as.ListAssetInterceptRules()
 			var allowRules []db.AssetInterceptRule
 			if t.taskID > 0 {
@@ -239,12 +239,12 @@ func (t *ToolSet) insertAssets() actool.CoreTool {
 			}
 
 			for i, item := range a.Assets {
-				// 资产闸门：先拦截后允许，被拒的资产禁止插入（跳过 Upsert 及后续副作用）。
+				// 자산 게이트(Asset Gate): 먼저 차단한 다음 허용합니다. 거부된 자산은 삽입이 금지됩니다(Upsert 및 후속 부작용 건너뛰기).
 				domains, ips, urls := assetInterceptCandidates(item)
 				if d := db.EvaluateAssetGate(blockRules, allowRules, domains, ips, urls); !d.Allowed {
 					errs = append(errs, errEntry{
 						Index: i,
-						Error: fmt.Sprintf("资产 %s %s，已禁止插入", assetInputLabel(item), d.Reason),
+						Error: fmt.Sprintf("자산 %s %s, 삽입 비활성화됨", assetInputLabel(item), d.Reason),
 					})
 					continue
 				}
@@ -346,16 +346,16 @@ func (t *ToolSet) insertAssets() actool.CoreTool {
 						nodeID := t.ownerNode
 						sourceNodeID = &nodeID
 					}
-					summary := "Agent 通过 insert_assets 登记"
+					summary := "insert_assets를 통해 등록된 Agent"
 					if t.ownerNode > 0 {
-						summary = fmt.Sprintf("Worker 意图 #%d 通过 insert_assets 登记", t.ownerNode)
+						summary = fmt.Sprintf("Worker 의도 #%d insert_assets에 의해 등록됨", t.ownerNode)
 					}
 					_ = t.as.SetTaskAssetSource(taskID, id, "agent", summary, sourceNodeID)
 				}
-				// 自动入测试范围(source='auto')：只对 worker 顶层显式插入的这一项，按其
-				// 类型加保守范围；side-effect 派生的资产不经此处，故范围不盲目扩大。taskID=0 时无操作。
-				// 与覆盖度开关无关：task_scope 是任务的范围边界(list/查询的过滤基准)，
-				// 覆盖度开关只决定要不要把它当分母去算指标，不决定要不要累积范围本身。
+				// 테스트 범위 자동 입력(source='auto'): worker의 최상위 레벨에 명시적으로 삽입된 항목에 대해서만
+				// 유형과 보수적인 범위; side-effect에서 파생된 자산은 이를 통과하지 않으므로 범위가 맹목적으로 확장되지 않습니다. taskID=0일 때 작동하지 않습니다.
+				// 이는 적용 범위 스위치와 아무 관련이 없습니다. task_scope는 작업의 범위 경계(list/ 쿼리의 필터링 기반)입니다.
+				// 커버리지 스위치는 범위 자체를 누적할지 여부가 아니라 지표 계산을 위한 분모로 사용할지 여부만 결정합니다.
 				{
 					svcIP := item.ServiceIP
 					if svcIP == "" {
@@ -377,20 +377,20 @@ func (t *ToolSet) insertAssets() actool.CoreTool {
 func (t *ToolSet) addCompanyScope() actool.CoreTool {
 	return writeTool(
 		"add_company_scope",
-		"把域名/IP/CIDR/ICP备案/企业关键词加入某公司的【资产范围】——域名、网络和ICP会自动认领命中的资产，关键词只提供给Agent作为范围提示。\n"+
-			"公司名唯一：company 不存在则新建，已存在则复用(只把范围并进去)。\n"+
-			"scope 一行一条，系统自动识别：根域名 / URL / 单个 IP / CIDR 网段 / ICP备案 / 企业关键词。\n"+
-			"务必给 reason 说明归属依据(whois/证书/ASN 等)。\n"+
-			"护栏：拒绝裸 TLD 与过宽网段(IPv4前缀需为/16-/32、IPv6前缀需为/32-/128)，非法行会被跳过并在 errors 返回。",
+		"도메인 이름/IP/CIDR/ICP 등록/기업 키워드를 회사의 [자산 범위]에 추가하세요. 도메인 이름, 네트워크 및 ICP는 자동으로 히트 자산을 청구하며 키워드는 범위 프롬프트로만 에이전트에 제공됩니다. \n"+
+			"회사 이름은 고유합니다: company. 존재하지 않는 경우 새로 작성하십시오. 이미 존재하는 경우 다시 사용하세요(범위 병합만 가능). \n"+
+			"scope는 한 번에 한 줄씩 자동으로 식별됩니다. 루트 도메인 이름 / URL / 단일 IP / CIDR 네트워크 세그먼트 / ICP 등록 / 기업 키워드. \n"+
+			"reason에 귀속근거(whois/ 인증서/ASN 등)를 반드시 설명해주세요. \n"+
+			"Guardrail: 네이키드 TLD 및 광범위한 네트워크 세그먼트(IPv4 접두사는 /16-/32여야 하고, IPv6 접두사는 /32-/128여야 함)를 거부하고, 잘못된 줄을 건너뛰고 errors에 반환합니다.",
 		obj(map[string]any{
-			"company": str("公司名(不存在则新建、存在则复用；名称唯一)"),
-			"scope":   str("资产范围，一行一条：域名 / URL / IP / CIDR / ICP备案 / 企业关键词"),
-			"reason":  str("归属依据(证据/来源)，务必填写"),
-			"logo":    str("公司图标 URL(可选；仅新建公司时生效)"),
+			"company": str("회사명(없으면 생성, 있으면 재사용, 이름은 고유함)"),
+			"scope":   str("자산 범위, 한 줄에 한 줄: 도메인 이름 / URL / IP / CIDR / ICP 파일링 / 기업 키워드"),
+			"reason":  str("귀속근거(증거/출처)를 반드시 기재해야 합니다."),
+			"logo":    str("회사 아이콘 URL(선택 사항, 새 회사를 생성하는 경우에만 유효)"),
 		}, "company", "scope"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			if t.cs == nil {
-				return actool.Errorf("add_company_scope 未启用: CompanyStore 未初始化"), nil
+				return actool.Errorf("add_company_scope가 활성화되지 않음: CompanyStore가 초기화되지 않음"), nil
 			}
 			var a struct {
 				Company string `json:"company"`
@@ -402,11 +402,11 @@ func (t *ToolSet) addCompanyScope() actool.CoreTool {
 				return actool.Errorf(err.Error()), nil
 			}
 			if strings.TrimSpace(a.Company) == "" {
-				return actool.Errorf("company 不能为空"), nil
+				return actool.Errorf("company는 비워둘 수 없습니다."), nil
 			}
 			companyID, _, err := t.cs.UpsertCompany(a.Company, a.Logo)
 			if err != nil {
-				return actool.Errorf("创建/获取公司失败: " + err.Error()), nil
+				return actool.Errorf("회사를 생성/가져오지 못했습니다: " + err.Error()), nil
 			}
 			lines := splitLines(a.Scope)
 			added, skipped, invalid, errMsgs := t.cs.AddScope(companyID, lines, a.Reason)
@@ -431,23 +431,23 @@ func (t *ToolSet) addCompanyScope() actool.CoreTool {
 func (t *ToolSet) addTaskScope() actool.CoreTool {
 	return writeTool(
 		"add_task_scope",
-		"把测试范围加入【本任务】——这是本任务的授权边界，也是资产测试覆盖度的分母。\n"+
-			"kind 支持：company(整个公司名下资产) / root_domain(整个根域，含所有子域) / subdomain(单个精确子域) / ip / cidr / icp / keyword。\n"+
-			"说明：worker 逐个碰到的主机会被系统【自动】加进范围(精确子域)；本工具用于【主动扩大】——把整个根域/整个公司纳入，或补充指定某子域/IP。\n"+
-			"value：company 传公司名或 id(公司须已存在)；root_domain/subdomain 传域名；ip/cidr 传 IP 或网段；icp/keyword 传备案号或企业关键词。\n"+
-			"务必给 reason 说明依据(可审计)。多条用 entries 数组。",
+		"[이 작업]에 테스트 범위를 추가합니다. 이는 이 작업의 인증 경계이자 자산 테스트 범위의 분모이기도 합니다. \n"+
+			"kind는 다음을 지원합니다: company(전체 회사 자산) / root_domain(모든 하위 도메인을 포함한 전체 루트 도메인) / subdomain(정확한 단일 하위 도메인) / ip / cidr / icp / keyword. \n"+
+			"설명: 호스트 worker가 하나씩 발견되면 시스템에 의해 범위(정확한 하위 도메인)에 [자동으로] 추가됩니다. 이 도구는 [활성 확장]에 사용됩니다. 전체 루트 도메인/회사 전체를 포함하거나 특정 하위 도메인/IP를 추가로 지정합니다. \n"+
+			"value: company는 회사 이름 또는 id를 전달합니다(회사는 이미 존재해야 함). root_domain/subdomain는 도메인 이름을 전달합니다. ip/cidr는 IP 또는 네트워크 세그먼트를 전달합니다. icp/keyword는 등록 번호 또는 회사 키워드를 전달합니다. \n"+
+			"reason(감사 가능)에 대한 근거를 반드시 설명하세요. 여러 라인에는 entries 어레이를 사용하십시오.",
 		obj(map[string]any{
-			"entries": map[string]any{"type": "array", "description": "批量：[{kind, value}]。kind∈company/root_domain/subdomain/ip/cidr/icp/keyword。", "items": map[string]any{"type": "object"}},
-			"kind":    str("[单条] company / root_domain / subdomain / ip / cidr / icp / keyword"),
-			"value":   str("[单条] 公司名或id / 域名 / IP / CIDR / ICP / 关键词"),
-			"reason":  str("加入依据(用于审计)，务必填写"),
+			"entries": map[string]any{"type": "array", "description": "일괄：[{kind, value}]。kind∈company/root_domain/subdomain/ip/cidr/icp/keyword。", "items": map[string]any{"type": "object"}},
+			"kind":    str("[하나의] company / root_domain / subdomain / ip / cidr / icp / keyword"),
+			"value":   str("[하나의] 회사 이름 또는id / 도메인 / IP / CIDR / ICP / 키워드"),
+			"reason":  str("가입근거(감사용), 반드시 기재"),
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			if t.as == nil {
-				return actool.Errorf("add_task_scope 未启用: AssetStore 未初始化"), nil
+				return actool.Errorf("add_task_scope가 활성화되지 않음: AssetStore가 초기화되지 않음"), nil
 			}
 			if t.taskID <= 0 {
-				return actool.Errorf("add_task_scope 需要任务上下文(当前无 task)"), nil
+				return actool.Errorf("add_task_scope에는 작업 컨텍스트가 필요합니다(현재 task는 없음)."), nil
 			}
 			type scopeEntry struct {
 				Kind  string `json:"kind"`
@@ -455,7 +455,7 @@ func (t *ToolSet) addTaskScope() actool.CoreTool {
 			}
 			var a struct {
 				Entries    []scopeEntry `json:"entries"`
-				scopeEntry              // 单条模式
+				scopeEntry              // 단일 모드
 				Reason     string       `json:"reason"`
 			}
 			_ = json.Unmarshal(in, &a)
@@ -487,20 +487,20 @@ func (t *ToolSet) addTaskScope() actool.CoreTool {
 func (t *ToolSet) listUntestedAssets() actool.CoreTool {
 	return readTool(
 		"list_untested_assets",
-		"查询【本任务及直接关联任务】范围内、还没被事实锚点覆盖的资产（关联范围只读，供你自己判断要不要补测，不代替你决策）。\n"+
-			"可选按资产类型过滤：root_domain/subdomain/service/app/endpoint/ip。\n"+
-			"分页：page 从 1 起、page_size 默认 10。返回 {assets:[{id,type,label}], total, page, page_size}。仅任务上下文可用。",
+		"팩트 앵커에 포함되지 않은 [이 작업 및 직접 관련된 작업] 범위 내의 자산을 쿼리합니다(관련 범위는 읽기 전용이므로 보충 테스트 여부를 판단할 수 있으며 사용자를 대신하여 결정을 내리지 않습니다). \n"+
+			"자산 유형별 선택적 필터링: root_domain/subdomain/service/app/endpoint/ip. \n"+
+			"페이징: page는 1부터 시작하고, page_size의 기본값은 10입니다. Return {assets:[{id,type,label}], total, page, page_size}. 작업 컨텍스트만 사용할 수 있습니다.",
 		obj(map[string]any{
-			"type":      str("资产类型过滤（可选）：root_domain/subdomain/service/app/endpoint/ip"),
-			"page":      intp("页码，从 1 起（默认 1）"),
-			"page_size": intp("每页数量（默认 10）"),
+			"type":      str("자산 유형 필터링(선택 사항): root_domain/subdomain/service/app/endpoint/ip"),
+			"page":      intp("1부터 시작하는 페이지 번호(기본값 1)"),
+			"page_size": intp("페이지당 수(기본값 10)"),
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			if t.as == nil {
-				return actool.Errorf("list_untested_assets 未启用: AssetStore 未初始化"), nil
+				return actool.Errorf("list_untested_assets가 활성화되지 않음: AssetStore가 초기화되지 않음"), nil
 			}
 			if t.taskID <= 0 || t.ts == nil {
-				return actool.Errorf("list_untested_assets 需要任务上下文"), nil
+				return actool.Errorf("list_untested_assets에는 작업 컨텍스트가 필요합니다."), nil
 			}
 			var a struct {
 				Type     string `json:"type"`
@@ -530,22 +530,22 @@ func (t *ToolSet) listUntestedAssets() actool.CoreTool {
 func (t *ToolSet) listAssets() actool.CoreTool {
 	return readTool(
 		"list_assets",
-		"查询资产库：DSL 表达式搜索，或按 id/ids 直取；支持分页。只返回【本任务及直接关联任务】测试范围内的资产。\n"+
-			"DSL：field=value 模糊(ILIKE) | field==value 精确 | field!=value 排除 | 数字字段支持 > >= < <= | 裸词=全文模糊；AND/OR 组合(AND 优先级高)，可用括号分组。资产类型用独立 type 参数，不写进 DSL。\n"+
-			"未传 id/ids 时 dsl 必须非空（不允许无条件全量查询）。\n"+
-			"可用字段：domain(根/子/服务域名)、root_domain、ip、url、page_title、icp、service_name、app_name、method(如 GET/POST)、service_type(http|other)、record_type(如 A/CNAME)、technology(数组，=模糊 ==精确)、port/status_code/company_id(整数)。\n"+
-			"示例：status_code>=400 AND technology=shiro ；(port==80 OR port==443) AND technology=nginx",
+		"자산 라이브러리 쿼리: DSL 표현식 검색 또는 id/ids를 눌러 직접 가져옵니다. 페이징이 지원됩니다. [이 작업 및 직접 관련된 작업]의 테스트 범위 내의 자산만 반환됩니다. \n"+
+			"DSL: field=value 퍼지(ILIKE) | field==value 정밀 | field!=value 제외 | 숫자 필드 지원 > >= < <= | 단순한 단어 = 전체 텍스트가 흐릿함; AND/OR 조합(AND는 우선순위가 높음), 괄호로 그룹화할 수 있습니다. 자산 유형은 독립적인 type 매개변수를 사용하며 DSL에 쓰지 않습니다. \n"+
+			"id/ids가 전송되지 않는 경우 dsl는 비어 있지 않아야 합니다(무조건 전체 쿼리는 허용되지 않음). \n"+
+			"사용 가능한 필드：domain(뿌리/아들/서비스 도메인 이름)、root_domain、ip、url、page_title、icp、service_name、app_name、method(좋다 GET/POST)、service_type(http|other)、record_type(좋다 A/CNAME)、technology(정렬，=희미한 ==정확한)、port/status_code/company_id(정수)。\n"+
+			"예: status_code>=400 AND technology=shiro; (port==80 OR port==443) AND technology=nginx",
 		obj(map[string]any{
-			"dsl":    str(`DSL 查询表达式（语法/字段见工具描述）。未传 id/ids 时必须非空。`),
-			"type":   str("资产类型过滤：root_domain|ip|subdomain|app|service|endpoint（独立字段，可与 dsl 叠加；单独 type 不足以查询，仍需 dsl）"),
-			"id":     intp("直接按单个资产 id 取（可选，与 dsl/type 互斥）"),
-			"ids":    map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "直接按多个资产 id 取（可选，与 dsl/type 互斥）"},
-			"limit":  intp("返回上限，默认 10（可选）"),
-			"offset": intp("分页偏移，默认 0（可选）"),
+			"dsl":    str(`DSL 쿼리 표현식(구문/필드에 대한 도구 설명 참조) id/ids가 전달되지 않은 경우 비어 있으면 안 됩니다.`),
+			"type":   str("자산 유형 필터：root_domain|ip|subdomain|app|service|endpoint（독립 필드로 다음과 함께 사용할 수 있습니다. dsl 씌우다; 홀로 type 쿼리할 만큼 충분하지 않지만 여전히 필요합니다. dsl）"),
+			"id":     intp("단일 자산 id에서 직접 가져오기(선택 사항, dsl/type와 상호 배타적)"),
+			"ids":    map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "여러 자산 id에서 직접 가져오기(선택 사항, dsl/type와 상호 배타적)"},
+			"limit":  intp("상한값을 반환합니다. 기본값은 10입니다(선택 사항)."),
+			"offset": intp("페이징 오프셋, 기본값 0(선택 사항)"),
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			if t.as == nil {
-				return actool.Errorf("list_assets 未启用: AssetStore 未初始化"), nil
+				return actool.Errorf("list_assets가 활성화되지 않음: AssetStore가 초기화되지 않음"), nil
 			}
 			var a struct {
 				DSL    string  `json:"dsl"`
@@ -570,10 +570,10 @@ func (t *ToolSet) listAssets() actool.CoreTool {
 			case a.DSL != "":
 				assets, err = t.as.QueryDSLInScope(a.DSL, a.Type, t.taskID, a.Limit, a.Offset)
 			default:
-				return actool.Errorf("未传 id/ids 时 dsl 不能为空：不允许无条件查询全部资产，请提供查询条件"), nil
+				return actool.Errorf("id/ids가 전송되지 않는 경우 dsl는 비워둘 수 없습니다. 모든 자산에 대한 무조건 쿼리는 허용되지 않습니다. 쿼리 조건을 제공하십시오."), nil
 			}
 			if err != nil {
-				return actool.Errorf("DSL 错误: " + err.Error()), nil
+				return actool.Errorf("DSL 오류: " + err.Error()), nil
 			}
 			return jsonResult(map[string]any{
 				"count":  len(assets),
@@ -583,19 +583,19 @@ func (t *ToolSet) listAssets() actool.CoreTool {
 	)
 }
 
-// listCompanies lets an agent enumerate companies (企业) with their scope + asset count.
+// listCompanies lets an agent enumerate companies (엔터프라이즈) with their scope + asset count.
 func (t *ToolSet) listCompanies() actool.CoreTool {
 	return readTool(
 		"list_companies",
-		"列出资产库中的【企业/公司】及其资产范围(scope)与已归属资产数。用于查看有哪些公司、"+
-			"拿到 company_id（insert_assets 关联 app、list_assets 按 company_id 过滤时用）。"+
-			"可选 search 按公司名模糊过滤(不区分大小写)，留空返回全部。",
+		"자산 라이브러리의 [기업/회사], 해당 자산 범위(scope) 및 귀속된 자산 수를 나열합니다. 어느 회사인지 알아보는데,"+
+			"company_id를 가져옵니다(insert_assets는 app, list_assets와 연결되어 있으며 company_id로 필터링할 때 사용됩니다)."+
+			"선택적 search 회사 이름별 퍼지 필터(대소문자 구분 안 함), 모두 반환하려면 비워 두세요.",
 		obj(map[string]any{
-			"search": str("按公司名模糊过滤(可选，不区分大小写)；留空返回全部"),
+			"search": str("회사 이름별 퍼지 필터(선택 사항, 대소문자 구분) 모두 반환하려면 비워 두세요."),
 		}),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			if t.cs == nil {
-				return actool.Errorf("list_companies 未启用: CompanyStore 未初始化"), nil
+				return actool.Errorf("list_companies가 활성화되지 않음: CompanyStore가 초기화되지 않음"), nil
 			}
 			var a struct {
 				Search string `json:"search"`
@@ -603,7 +603,7 @@ func (t *ToolSet) listCompanies() actool.CoreTool {
 			_ = json.Unmarshal(in, &a)
 			cos, err := t.cs.ListCompanies()
 			if err != nil {
-				return actool.Errorf("查询公司失败: " + err.Error()), nil
+				return actool.Errorf("회사를 쿼리하지 못했습니다: " + err.Error()), nil
 			}
 			q := strings.ToLower(strings.TrimSpace(a.Search))
 			type companyOut struct {
@@ -643,20 +643,20 @@ func splitLines(s string) []string {
 // WorkerTools returns the tool set for a work agent.
 func (t *ToolSet) WorkerTools() []actool.CoreTool {
 	return []actool.CoreTool{
-		// list_findings 保留：报漏洞前先查本任务已确认漏洞，避免重复上报同一漏洞。
+		// list_findings 예약됨: 취약점을 보고하기 전에 이 작업에서 확인된 취약점을 확인하여 동일한 취약점이 반복적으로 보고되는 것을 방지하세요.
 		t.listFindings(),
 		t.addFinding(), t.recordFact(),
 		// asset management (handlers guard nil store internally)。
-		// add_company_scope 不给 worker：定义企业资产范围属规划/主控/Auto 的职责，worker 只执行探索。
+		// add_company_scope 제공되지 않음 worker: 기업 자산의 범위 정의는 계획/마스터/Auto의 책임이며, worker는 탐색만 수행합니다.
 		t.insertAssets(), t.listAssets(),
-		// 跨 work 回看：worker 也可复用其他 work 的观察，避免重复劳动。
-		// search_all_worker_traces：不必先知道 intent_id，按关键字全局捞命中步骤；
-		// get_worker_trace：锁定某条 work 后列步骤/就地搜/取完整内容。
+		// work를 되돌아보세요: worker는 작업 중복을 피하기 위해 다른 work의 관찰을 재사용할 수도 있습니다.
+		// search_all_worker_traces: intent_id를 먼저 알 필요는 없습니다. 키워드를 따라가면 전 세계적으로 히트 단계를 얻을 수 있습니다.
+		// get_worker_trace: 특정 work/검색/즉시 전체 콘텐츠 가져오기의 다음 단계를 잠급니다.
 		t.searchAllWorkerTraces(), t.getWorkerTrace(),
-		// node_detail：worker 拿到 intent_id/节点 id 后可查该节点完整详情（配合上面的回看）。
+		// node_detail: worker intent_id/노드 id를 얻은 후 노드의 전체 세부 정보를 확인할 수 있습니다(위 검토에 협조).
 		t.nodeDetail(),
-		// 以下工具仍【不给】worker，只留给 planner/main（读上下文、跨 work 复盘是规划职责，
-		// worker 只做单条意图的执行与写回）：list_facts / list_companies / list_worker_traces。
+		// 다음 도구는 worker에 대해 아직 사용할 수 없으며 planner/main만 사용할 수 있습니다(컨텍스트를 읽고 work 전체를 검토하는 것은 계획 책임입니다.
+		// worker는 단일 의도(list_facts / list_companies / list_worker_traces)만 실행하고 다시 작성합니다.
 	}
 }
 
@@ -666,17 +666,17 @@ func (t *ToolSet) MainAgentTools() []actool.CoreTool {
 		t.graphOverview(), t.listFindings(), t.listFacts(), t.nodeDetail(),
 		t.expandDigest(), // cold-digest §6.1
 		t.getWorkerOutput(), t.getWorkerTrace(), t.searchAllWorkerTraces(), t.addHint(), t.addIntent(),
-		// steer_work：人可对某条正在运行的意图(work)实时注入纠偏指令（不打断、不丢进展）。
+		// steer_work: 사람들은 실행 중인 의도(work)에 실시간으로(진행을 중단하거나 손실하지 않고) 수정 지침을 주입할 수 있습니다.
 		t.steerWorkTool(),
-		// set_goals：人可在运行时给本任务补一个新的最终目标（规划者据此重判是否达成）。
+		// set_goals: 사람들은 런타임에 이 작업에 새로운 최종 목표를 추가할 수 있습니다(플래너는 이를 기반으로 달성 여부를 다시 판단합니다).
 		t.setGoals(),
-		// set_constraints：人可在运行时给本任务补/改操作约束（allow/deny），约束 planner/worker 的探索边界。
+		// set_constraints: 사람들은 런타임에 이 작업에 대한 작업 제약 조건(allow/deny)을 추가/수정하고 planner/worker의 탐색 경계를 제약할 수 있습니다.
 		t.setConstraints(),
 		// asset management (handlers guard nil store internally)
 		t.insertAssets(), t.addCompanyScope(), t.listAssets(),
 		t.addFinding(), t.recordFact(),
 		t.addTaskScope(),
-		// list_untested_assets：按需查本任务范围内未测资产(类型+分页)，自行决定补测。
+		// list_untested_assets: 필요에 따라 이 작업 범위 내에서 테스트되지 않은 자산(유형 + 페이징)을 확인하고 재량에 따라 추가 테스트를 수행합니다.
 		t.listUntestedAssets(),
 	}
 }

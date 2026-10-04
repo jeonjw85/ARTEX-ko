@@ -40,10 +40,10 @@ export function ReportTab({ taskId }: { taskId: string }) {
     const ok = await copyText(report);
     if (ok) {
       setCopied(true);
-      toast.success("已复制 Markdown");
+      toast.success("Markdown 복사됨");
       setTimeout(() => setCopied(false), 1500);
     } else {
-      toast.error("复制失败，请手动选择文本复制");
+      toast.error("복사하지 못했습니다. 복사할 텍스트를 수동으로 선택하세요.");
     }
   }
 
@@ -52,7 +52,7 @@ export function ReportTab({ taskId }: { taskId: string }) {
     content = (
       <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed py-16 text-muted-foreground text-sm">
         <FileTextIcon className="size-8 opacity-40" />
-        加载中…
+        로드 중…
       </div>
     );
   } else if (report) {
@@ -65,7 +65,7 @@ export function ReportTab({ taskId }: { taskId: string }) {
     content = (
       <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed py-16 text-muted-foreground text-sm">
         <FileTextIcon className="size-8 opacity-40" />
-        暂无报告
+        아직 보고서가 없습니다.
       </div>
     );
   }
@@ -74,12 +74,12 @@ export function ReportTab({ taskId }: { taskId: string }) {
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <FileTextIcon className="size-4" /> 渗透测试报告（Markdown）
+          <FileTextIcon className="size-4" /> 침투 테스트 보고서(Markdown)
         </CardTitle>
         <div className="flex gap-2">
           {report && (
             <Button size="sm" variant="outline" onClick={copy}>
-              {copied ? <CheckIcon /> : <CopyIcon />} 复制
+              {copied ? <CheckIcon /> : <CopyIcon />} 복사
             </Button>
           )}
         </div>

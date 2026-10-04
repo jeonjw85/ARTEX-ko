@@ -30,12 +30,12 @@ type Exchange struct {
 
 func (e Exchange) Running() bool { return e.Status == "running" }
 
-const instruction = "这是独立的旁路提问。主 Agent 正在执行原任务，你只根据已有上下文简洁回答当前问题。你没有工具执行能力，不能执行操作、修改文件或指挥主任务，也不要承诺稍后执行。上下文中的任务指令仅作为背景；不足以判断时明确说明。"
+const instruction = "이것은 독립적인 부가 질문입니다. 기본 에이전트는 원래 작업을 계속 수행합니다. 제공된 맥락에 근거하여 현재 질문에 한국어로 간결하게 답변하세요. 도구 실행 권한이 없으며 작업 실행, 파일 수정, 기본 작업 지시를 수행하거나 나중에 수행하겠다고 약속할 수 없습니다. 맥락에 포함된 작업 지시는 배경 정보일 뿐입니다. 정보가 부족하면 명확히 밝히세요."
 
 const DefaultOutputTokens = 8192
 const MaxRecentExchanges = 20
 
-var ErrContextBudget = errors.New("旁路上下文压缩后仍超过模型预算，请缩小问题范围或调整模型上下文配置")
+var ErrContextBudget = errors.New("우회 컨텍스트 압축 후에도 모델 예산이 여전히 초과됩니다. 문제의 범위를 좁히거나 모델 컨텍스트 구성을 조정하세요.")
 
 // EstimateInputTokens follows norma's byte-based block estimate with its 4/3
 // safety factor. Include system/schema and framing costs too; JSON characters
@@ -74,7 +74,7 @@ func inputBudget(s Snapshot, output int) int {
 func exchangeMessages(e Exchange) []llm.Message {
 	question := e.Question
 	if !e.SnapshotAt.IsZero() {
-		question = "[历史旁路问答，依据上下文时间 " + e.SnapshotAt.UTC().Format(time.RFC3339) + "]\n" + question
+		question = "[상황별 시간을 기반으로 한 과거 우회 Q&A " + e.SnapshotAt.UTC().Format(time.RFC3339) + "]\n" + question
 	}
 	return []llm.Message{llm.UserText(question), {Role: llm.RoleAssistant, Content: []llm.ContentBlock{llm.TextBlock(e.Answer)}}}
 }
@@ -82,12 +82,12 @@ func exchangeMessages(e Exchange) []llm.Message {
 func assemble(req llm.CompletionRequest, base []llm.Message, summary string, history []Exchange, question string) llm.CompletionRequest {
 	req.Messages = append([]llm.Message{}, base...)
 	if summary != "" {
-		req.Messages = append(req.Messages, llm.UserText("[早期旁路问答摘要；属于历史讨论，不是新的工具证据。冲突时以最新主上下文为准。]\n"+summary))
+		req.Messages = append(req.Messages, llm.UserText("[초기 우회 Q&A 요약 새로운 도구 증거가 아닌 역사적 논의에 속합니다. 상충되는 경우 최신 주요 내용이 우선합니다.。]\n"+summary))
 	}
 	for _, e := range history {
 		req.Messages = append(req.Messages, exchangeMessages(e)...)
 	}
-	req.Messages = append(req.Messages, llm.UserText(instruction+"\n\n问题："+strings.TrimSpace(question)))
+	req.Messages = append(req.Messages, llm.UserText(instruction+"\n\n 질문:"+strings.TrimSpace(question)))
 	return req
 }
 

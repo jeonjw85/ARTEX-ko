@@ -1,8 +1,8 @@
-# Tracing
+# 트레이싱
 
-Capture detailed execution traces for debugging and analysis. Traces include DOM snapshots, screenshots, network activity, and console logs.
+디버깅 및 분석을 위해 자세한 실행 추적을 캡처합니다. 추적에는 DOM 스냅샷, 스크린샷, 네트워크 활동 및 콘솔 로그가 포함됩니다.
 
-## Basic Usage
+## 기본 사용법
 
 ```bash
 # Start trace recording
@@ -17,51 +17,51 @@ playwright-cli fill e2 "test"
 playwright-cli tracing-stop
 ```
 
-## Trace Output Files
+## 추적 출력 파일
 
-When you start tracing, Playwright creates a `traces/` directory with several files:
+추적을 시작하면 Playwright는 여러 파일이 포함된 `traces/` 디렉터리를 생성합니다.
 
 ### `trace-{timestamp}.trace`
 
-**Action log** - The main trace file containing:
-- Every action performed (clicks, fills, navigations)
-- DOM snapshots before and after each action
-- Screenshots at each step
-- Timing information
-- Console messages
-- Source locations
+**작업 로그** - 다음을 포함하는 기본 추적 파일:
+- 수행된 모든 작업(클릭, 채우기, 탐색)
+- 각 작업 전후의 DOM 스냅샷
+- 각 단계의 스크린샷
+- 타이밍 정보
+- 콘솔 메시지
+- 소스 위치
 
 ### `trace-{timestamp}.network`
 
-**Network log** - Complete network activity:
-- All HTTP requests and responses
-- Request headers and bodies
-- Response headers and bodies
-- Timing (DNS, connect, TLS, TTFB, download)
-- Resource sizes
-- Failed requests and errors
+**네트워크 로그** - 전체 네트워크 활동:
+- 모든 HTTP 요청 및 응답
+- 요청 헤더 및 본문
+- 응답 헤더 및 본문
+- 타이밍(DNS, 연결, TLS, TTFB, 다운로드)
+- 리소스 크기
+- 실패한 요청 및 오류
 
 ### `resources/`
 
-**Resources directory** - Cached resources:
-- Images, fonts, stylesheets, scripts
-- Response bodies for replay
-- Assets needed to reconstruct page state
+**리소스 디렉터리** - 캐시된 리소스:
+- 이미지, 글꼴, 스타일시트, 스크립트
+- 재생을 위한 응답 본문
+- 페이지 상태를 재구성하는 데 필요한 자산
 
-## What Traces Capture
+## 추적이 캡처하는 것
 
-| Category | Details |
+| 범주 | 세부 |
 |----------|---------|
-| **Actions** | Clicks, fills, hovers, keyboard input, navigations |
-| **DOM** | Full DOM snapshot before/after each action |
-| **Screenshots** | Visual state at each step |
-| **Network** | All requests, responses, headers, bodies, timing |
-| **Console** | All console.log, warn, error messages |
-| **Timing** | Precise timing for each operation |
+| **행위** | 클릭, 채우기, 마우스 오버, 키보드 입력, 탐색 |
+| **돔** | 각 작업 전/후 전체 DOM 스냅샷 |
+| **스크린샷** | 각 단계의 시각적 상태 |
+| **회로망** | 모든 요청, 응답, 헤더, 본문, 타이밍 |
+| **콘솔** | 모든 console.log, 경고, 오류 메시지 |
+| **타이밍** | 각 작업의 정확한 타이밍 |
 
-## Use Cases
+## 사용 사례
 
-### Debugging Failed Actions
+### 실패한 작업 디버깅
 
 ```bash
 playwright-cli tracing-start
@@ -74,7 +74,7 @@ playwright-cli tracing-stop
 # Open trace to see DOM state when click was attempted
 ```
 
-### Analyzing Performance
+### 성능 분석
 
 ```bash
 playwright-cli tracing-start
@@ -84,7 +84,7 @@ playwright-cli tracing-stop
 # View network waterfall to identify slow resources
 ```
 
-### Capturing Evidence
+### 증거 수집
 
 ```bash
 # Record a complete user flow for documentation
@@ -100,20 +100,20 @@ playwright-cli tracing-stop
 # Trace shows exact sequence of events
 ```
 
-## Trace vs Video vs Screenshot
+## 추적 vs 비디오 vs 스크린샷
 
-| Feature | Trace | Video | Screenshot |
+| 특징 | 추적하다 | 동영상 | 스크린샷 |
 |---------|-------|-------|------------|
-| **Format** | .trace file | .webm video | .png/.jpeg image |
-| **DOM inspection** | Yes | No | No |
-| **Network details** | Yes | No | No |
-| **Step-by-step replay** | Yes | Continuous | Single frame |
-| **File size** | Medium | Large | Small |
-| **Best for** | Debugging | Demos | Quick capture |
+| **체재** | .trace 파일 | .webm 비디오 | .png/.jpeg 이미지 |
+| **DOM 검사** | 예 | 아니요 | 아니요 |
+| **네트워크 세부정보** | 예 | 아니요 | 아니요 |
+| **단계별 재생** | 예 | 마디 없는 | 단일 프레임 |
+| **파일 크기** | 중간 | 크기가 큰 | 작은 |
+| **최적의 용도** | 디버깅 | 시민 | 빠른 캡처 |
 
-## Best Practices
+## 모범 사례
 
-### 1. Start Tracing Before the Problem
+### 1. 문제가 발생하기 전에 추적을 시작하세요
 
 ```bash
 # Trace the entire flow, not just the failing step
@@ -123,17 +123,17 @@ playwright-cli open https://example.com
 playwright-cli tracing-stop
 ```
 
-### 2. Clean Up Old Traces
+### 2. 오래된 흔적 정리
 
-Traces can consume significant disk space:
+추적은 상당한 디스크 공간을 소비할 수 있습니다.
 
 ```bash
 # Remove traces older than 7 days
 find .playwright-cli/traces -mtime +7 -delete
 ```
 
-## Limitations
+## 제한 사항
 
-- Traces add overhead to automation
-- Large traces can consume significant disk space
-- Some dynamic content may not replay perfectly
+- 추적은 자동화에 오버헤드를 추가합니다.
+- 대규모 추적은 상당한 디스크 공간을 소비할 수 있습니다.
+- 일부 동적 콘텐츠가 완벽하게 재생되지 않을 수 있습니다.

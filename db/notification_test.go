@@ -9,9 +9,9 @@ import (
 	"github.com/Autumn-27/artex/notify"
 )
 
-// 本文件的用例都会真连 PostgreSQL（无库时跳过）。这些 SQL 用到了
-// FOR UPDATE SKIP LOCKED、make_interval、JSONB、多行 IN(...) 占位符拼接，
-// 都是「编译通过但可能运行时报错」的写法，必须实跑才算验证过。
+// 이 문서의 사용 사례는 모두 PostgreSQL에 연결됩니다(라이브러리가 없으면 건너뛰기). 이 SQL는 사용됩니다
+// FOR UPDATE SKIP LOCKED, make_interval, JSONB, 다중 라인 IN(...) 자리 표시자 접합,
+// 모두 "컴파일은 통과했지만 실행 시 오류가 발생할 수 있다"는 방식으로 작성되었으며, 실행을 해야 검증된 것으로 간주됩니다.
 
 func notifyTestDB(t *testing.T) *DB {
 	t.Helper()
@@ -23,14 +23,14 @@ func notifyTestDB(t *testing.T) *DB {
 	return d
 }
 
-// newTestChannel 建一个渠道，测试结束自动删除。
+// newTestChannel 채널을 생성하고 테스트 후 자동으로 삭제합니다.
 func newTestChannel(t *testing.T, d *DB, kind, mode string, filter string) *NotificationChannel {
 	t.Helper()
 	if filter == "" {
 		filter = `{}`
 	}
 	ch := &NotificationChannel{
-		Name:       "测试渠道-" + t.Name(),
+		Name:       "테스트 채널-" + t.Name(),
 		Kind:       kind,
 		Mode:       mode,
 		Config:     json.RawMessage(`{"webhook":"https://example.com/hook"}`),
@@ -39,21 +39,21 @@ func newTestChannel(t *testing.T, d *DB, kind, mode string, filter string) *Noti
 	}
 	id, err := d.SaveNotificationChannel(context.Background(), ch)
 	if err != nil {
-		t.Fatalf("建渠道失败: %v", err)
+		t.Fatalf("채널 생성 실패: %v", err)
 	}
 	t.Cleanup(func() { d.Exec(`DELETE FROM notification_channels WHERE id=$1`, id) })
 	ch.ID = id
 	return ch
 }
 
-// addTestEvent 直接写一条事件（不经 finding），用于测试分派与投递。
+// addTestEvent는 발송 및 배송 테스트를 위해 finding를 거치지 않고 직접 이벤트를 작성합니다.
 func addTestEvent(t *testing.T, d *DB, kind string, findingID int64, snap notify.Snapshot) int64 {
 	t.Helper()
 	snap.Kind = kind
 	snap.FindingID = findingID
 	id, err := d.AddNotificationEvent(context.Background(), kind, findingID, snap)
 	if err != nil {
-		t.Fatalf("写事件失败: %v", err)
+		t.Fatalf("이벤트 쓰기 실패: %v", err)
 	}
 	t.Cleanup(func() { d.Exec(`DELETE FROM notification_events WHERE id=$1`, id) })
 	return id
@@ -63,7 +63,7 @@ func TestNotificationAssetNamesResolvesAndPreservesOrder(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
 
-	// 三类资产各有各的展示口径：域名、IP、URL。
+	// 세 가지 유형의 자산 각각에는 도메인 이름, IP 및 URL라는 자체 디스플레이 구경이 있습니다.
 	insertAsset := func(query, value string) int64 {
 		t.Helper()
 		var id int64
@@ -79,39 +79,39 @@ func TestNotificationAssetNamesResolvesAndPreservesOrder(t *testing.T) {
 		d.Exec(`DELETE FROM assets WHERE id IN ($1,$2,$3)`, domID, ipID, svcID)
 	})
 
-	// 传入顺序刻意乱序，且含一个不存在的 id。
+	// 들어오는 주문이 의도적으로 순서가 잘못되어 존재하지 않는 id가 포함되어 있습니다.
 	got, err := d.NotificationAssetNames(ctx, []int64{svcID, 999999999, domID, ipID, svcID})
 	if err != nil {
-		t.Fatalf("解析资产名失败: %v", err)
+		t.Fatalf("자산 이름 구문 분석 실패: %v", err)
 	}
 	want := []string{"https://a.example.com/admin", "a.example.com", "10.1.2.3"}
 	if len(got) != len(want) {
-		t.Fatalf("资产名数量不符，期望 %v 得到 %v", want, got)
+		t.Fatalf("자산 이름 수가 일치하지 않습니다. %v를 기대하고 %v를 얻으세요.", want, got)
 	}
 	for i := range want {
 		if got[i] != want[i] {
-			t.Fatalf("顺序/取值不符，期望 %v 得到 %v", want, got)
+			t.Fatalf("순서/값이 일치하지 않습니다. %v를 예상하고 %v를 가져옵니다.", want, got)
 		}
 	}
 }
 
-// TestRecordNotificationEventTxUnwindsOnFailure 是保存点机制的核心用例：
-// 在事务里先让 notification_events 的写入必然失败（临时加一个恒 false 的约束），
-// 断言 ① 该函数报 false ② 事务没有进入 aborted 状态，后续语句仍能执行。
+// TestRecordNotificationEventTxUnwindsOnFailure는 저장점 메커니즘의 핵심 사용 사례입니다.
+// 트랜잭션에서 먼저 notification_events 쓰기가 필연적으로 실패하도록 합니다(일시적으로 상수 false 제약 조건 추가).
+// Assertion ① 함수는 false를 보고합니다. ② 트랜잭션은 aborted 상태에 진입하지 않으며 후속 명령문은 계속 실행될 수 있습니다.
 //
-// 没有保存点的话，PostgreSQL 会让整个事务作废，后续任何语句都以
-// "current transaction is aborted" 失败——那正是「一个通知表的问题导致
-// 漏洞存不进库」的故障路径。
+// 저장 지점이 없으면 PostgreSQL는 전체 트랜잭션을 무효화하고 모든 후속 명령문은 다음으로 끝납니다.
+// "current transaction is aborted"가 실패했습니다. 이는 정확히 "알림 테이블에 문제가 발생하여 발생했습니다.
+// 결함 경로는 취약점을 데이터베이스에 저장할 수 없다는 것입니다.
 //
-// 这里刻意用 **ROLLBACK 收尾而不是 COMMIT**：ALTER TABLE 在 PG 里是事务性的，
-// 一旦提交，那个临时约束就会永久留在 schema 里，把后续所有用例一起打挂。
-// 回滚能自动撤销 DDL，无需手工清理。断言只需要「事务还活着」，
-// 不需要真的提交。
+// 여기서는 의도적으로 COMMIT** 대신 **ROLLBACK로 끝납니다. ALTER TABLE는 PG에서 트랜잭션입니다.
+// 제출되면 임시 제약조건은 schema에 영구적으로 유지되어 모든 후속 사용 사례가 일시 중지됩니다.
+// 롤백은 수동 정리 없이 DDL를 자동으로 실행 취소할 수 있습니다. 어설션에는 "트랜잭션이 활성화되어 있음"만 필요합니다.
+// 실제 제출은 필요하지 않습니다.
 func TestRecordNotificationEventTxUnwindsOnFailure(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
 
-	// 防御性清理：若历史运行留下过这个约束，先摘掉。
+	// 방어적 정리: 과거 작업에 이 제약 조건이 남아 있는 경우 먼저 제거합니다.
 	if _, err := d.Exec(`ALTER TABLE notification_events DROP CONSTRAINT IF EXISTS notify_test_never`); err != nil {
 		t.Fatal(err)
 	}
@@ -120,31 +120,31 @@ func TestRecordNotificationEventTxUnwindsOnFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback() //nolint:errcheck // 撤销临时约束，见函数注释
+	defer tx.Rollback() //nolint:errcheck // 임시 제약 조건 취소, 함수 설명 참조
 
-	// NOT VALID：只约束此后写入的行，不去校验库里已有的历史事件
-	// （否则存量行违规会导致约束加不上）。
+	// NOT VALID: 이 이후에 작성된 행만 제한되며 이미 라이브러리에 있는 기록 이벤트는 확인되지 않습니다.
+	// (그렇지 않으면 기존 행 위반으로 인해 제약 조건이 추가되지 않습니다.)
 	if _, err := tx.ExecContext(ctx, `ALTER TABLE notification_events ADD CONSTRAINT notify_test_never CHECK (false) NOT VALID`); err != nil {
-		t.Fatalf("加临时约束失败: %v", err)
+		t.Fatalf("임시 제약 조건을 추가하지 못했습니다: %v", err)
 	}
 	if RecordNotificationEventTx(ctx, tx, notify.EventFindingCreated, 1, notify.Snapshot{Severity: "high"}) {
-		t.Fatal("在必然失败的约束下仍报告写入成功")
+		t.Fatal("실패해야 한다는 제약에도 불구하고 쓰기 성공을 보고합니다.")
 	}
-	// 关键断言：事务还能用。
+	// 주요 주장: 거래가 여전히 가능합니다.
 	var one int
 	if err := tx.QueryRowContext(ctx, `SELECT 1`).Scan(&one); err != nil {
-		t.Fatalf("事务已被污染（保存点未生效）: %v", err)
+		t.Fatalf("트랜잭션이 오염되었습니다(저장점이 적용되지 않음): %v", err)
 	}
 	if err := tx.Rollback(); err != nil {
-		t.Fatalf("回滚失败: %v", err)
+		t.Fatalf("롤백 실패: %v", err)
 	}
-	// 确认 DDL 已随回滚撤销，不给后续用例留雷。
+	// DDL가 롤백과 함께 취소되어 후속 사용 사례에 대한 기회가 없는지 확인합니다.
 	var exists bool
 	if err := d.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='notify_test_never')`).Scan(&exists); err != nil {
 		t.Fatal(err)
 	}
 	if exists {
-		t.Fatal("临时约束未被回滚撤销，会污染后续用例")
+		t.Fatal("임시 제약 조건은 롤백으로 취소되지 않으므로 후속 사용 사례가 오염됩니다.")
 	}
 }
 
@@ -156,12 +156,12 @@ func TestFanOutRoutesEventsByFilter(t *testing.T) {
 	onlyCritical := newTestChannel(t, d, notify.KindDingTalk, NotifyModeRealtime, `{"min_severity":"critical"}`)
 	sqlOnly := newTestChannel(t, d, notify.KindDingTalk, NotifyModeRealtime, `{"vulnclass_include":["SQL"]}`)
 
-	highSQL := addTestEvent(t, d, notify.EventFindingCreated, 1001, notify.Snapshot{Severity: "high", VulnClass: "SQL注入"})
+	highSQL := addTestEvent(t, d, notify.EventFindingCreated, 1001, notify.Snapshot{Severity: "high", VulnClass: "SQL 주입"})
 	lowXSS := addTestEvent(t, d, notify.EventFindingCreated, 1002, notify.Snapshot{Severity: "low", VulnClass: "XSS"})
 	criticalXSS := addTestEvent(t, d, notify.EventFindingCreated, 1003, notify.Snapshot{Severity: "critical", VulnClass: "XSS"})
 
 	if _, _, err := d.FanOutPendingEvents(ctx, 100); err != nil {
-		t.Fatalf("分派失败: %v", err)
+		t.Fatalf("발송 실패: %v", err)
 	}
 
 	cases := []struct {
@@ -170,12 +170,12 @@ func TestFanOutRoutesEventsByFilter(t *testing.T) {
 		channel int64
 		want    bool
 	}{
-		{"全收渠道收到 high", highSQL, all.ID, true},
-		{"全收渠道收到 low", lowXSS, all.ID, true},
-		{"仅严重渠道跳过 high", highSQL, onlyCritical.ID, false},
-		{"仅严重渠道收到 critical", criticalXSS, onlyCritical.ID, true},
-		{"仅SQL渠道收到 SQL", highSQL, sqlOnly.ID, true},
-		{"仅SQL渠道跳过 XSS", lowXSS, sqlOnly.ID, false},
+		{"모든 채널을 통해 high 수신", highSQL, all.ID, true},
+		{"모든 채널을 통해 low 수신", lowXSS, all.ID, true},
+		{"중요한 채널만 high를 건너뜁니다.", highSQL, onlyCritical.ID, false},
+		{"심각한 채널만 critical를 수신합니다.", criticalXSS, onlyCritical.ID, true},
+		{"SQL 채널만 SQL를 수신합니다.", highSQL, sqlOnly.ID, true},
+		{"SQL 채널만 XSS를 건너뛰었습니다.", lowXSS, sqlOnly.ID, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -185,27 +185,27 @@ func TestFanOutRoutesEventsByFilter(t *testing.T) {
 				t.Fatal(err)
 			}
 			if exists != tc.want {
-				t.Fatalf("投递是否存在: 期望 %v 得到 %v", tc.want, exists)
+				t.Fatalf("배송 존재: %v 예상 %v 받기", tc.want, exists)
 			}
 		})
 	}
 
-	// 再分派一次不应产生重复投递（fanned_out 幂等）。
+	// 다시 디스패치하면 중복 전달이 발생하지 않습니다(fanned_out 멱등성).
 	events, deliveries, err := d.FanOutPendingEvents(ctx, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if events != 0 || deliveries != 0 {
-		t.Fatalf("已分派的事件不应被再次处理，得到 events=%d deliveries=%d", events, deliveries)
+		t.Fatalf("디스패치된 이벤트는 다시 처리되어서는 안 됩니다. events=%d deliveries=%d", events, deliveries)
 	}
 }
 
-// TestFanOutMarksEventsWithNoMatchingChannel 覆盖「事件没命中任何渠道」的情况。
-// 这类事件必须照样被标记为已分派，否则它会永远留在待分派集合里、每个 tick 重扫。
+// TestFanOutMarksEventsWithNoMatchingChannel는 "이벤트가 어떤 채널에도 도달하지 않는" 상황을 다룹니다.
+// 이러한 유형의 이벤트는 여전히 전달된 것으로 표시되어야 합니다. 그렇지 않으면 전달될 세트에 영원히 남아 있으며 tick마다 다시 검색됩니다.
 func TestFanOutMarksEventsWithNoMatchingChannel(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
-	pick := newTestChannel(t, d, notify.KindDingTalk, NotifyModeRealtime, `{"vulnclass_include":["绝不匹配的类型"]}`)
+	pick := newTestChannel(t, d, notify.KindDingTalk, NotifyModeRealtime, `{"vulnclass_include":["유형이 일치하지 않음"]}`)
 	_ = pick
 
 	ev := addTestEvent(t, d, notify.EventFindingCreated, 2001, notify.Snapshot{Severity: "high", VulnClass: "XSS"})
@@ -214,14 +214,14 @@ func TestFanOutMarksEventsWithNoMatchingChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	if deliveries != 0 {
-		t.Fatalf("不该产生投递，得到 %d", deliveries)
+		t.Fatalf("배송이 발생하지 않아야 합니다. %d를 받았습니다.", deliveries)
 	}
 	var fanned bool
 	if err := d.QueryRowContext(ctx, `SELECT fanned_out FROM notification_events WHERE id=$1`, ev).Scan(&fanned); err != nil {
 		t.Fatal(err)
 	}
 	if !fanned {
-		t.Fatal("未命中渠道的事件也必须标记为已分派，否则会被无限重扫")
+		t.Fatal("채널을 놓친 이벤트도 전달된 것으로 표시되어야 하며, 그렇지 않으면 무한히 다시 검색됩니다.")
 	}
 }
 
@@ -237,47 +237,47 @@ func TestClaimRealtimeDeliveriesHonorsLeaseAndMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 实时领取只应拿到 realtime 渠道的那条，不该动 digest 渠道的。
+	// 실시간 결제를 위해서는 realtime 채널에서만 받으셔야 하며, digest 채널은 건드리지 마세요.
 	got, err := d.ClaimRealtimeDeliveries(ctx, realtime.ID, 10, time.Minute)
 	if err != nil {
-		t.Fatalf("领取失败: %v", err)
+		t.Fatalf("수신 실패: %v", err)
 	}
 	if len(got) != 1 {
-		t.Fatalf("应领到 1 条，得到 %d", len(got))
+		t.Fatalf("아이템 1개를 받고 %d를 받아야 합니다.", len(got))
 	}
 	if got[0].State != NotifyStateSending || got[0].Attempts != 1 {
-		t.Fatalf("领取后应为 sending 且 attempts=1，得到 state=%s attempts=%d", got[0].State, got[0].Attempts)
+		t.Fatalf("그것을 받은 후에는 sending 및 attempts=1이어야 하며 state=%s attempts=%d를 받아야 합니다.", got[0].State, got[0].Attempts)
 	}
-	// 关联加载的渲染上下文必须齐全（渠道配置 + 事件快照 + finding id）。
+	// 연관된 로드된 렌더링 컨텍스트가 완료되어야 합니다(채널 구성 + 이벤트 스냅샷 + finding id).
 	if got[0].Channel == nil || len(got[0].Channel.Config) == 0 {
-		t.Fatal("领取结果缺少渠道配置，渲染会失败")
+		t.Fatal("결과를 받을 때 채널 구성이 누락되어 렌더링이 실패합니다.")
 	}
 	if got[0].FindingID != 3001 {
-		t.Fatalf("finding id 未从事件带出，得到 %d", got[0].FindingID)
+		t.Fatalf("finding id가 이벤트에서 나오지 않아 %d를 받았습니다.", got[0].FindingID)
 	}
 
-	// 租约未到期，第二次领取应为空——这是「同一行不会被两个 dispatcher 同时投递」
-	// 的保证。
+	// 임대가 만료되지 않았으며 두 번째 컬렉션은 비어 있어야 합니다. 이는 "동일한 라인은 두 개의 dispatcher에 의해 동시에 전달되지 않습니다"입니다.
+	// 보장하다.
 	again, err := d.ClaimRealtimeDeliveries(ctx, realtime.ID, 10, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(again) != 0 {
-		t.Fatalf("租约期内不应重复领取，得到 %d 条", len(again))
+		t.Fatalf("임대 기간 동안 반복적으로 수집해서는 안 되며, %d를 받게 됩니다.", len(again))
 	}
 
-	// digest 渠道的投递不应被实时领取碰到。
+	// digest 채널의 배송은 실시간 픽업으로 발생하지 않아야 합니다.
 	left, err := d.ClaimRealtimeDeliveries(ctx, digest.ID, 10, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(left) != 0 {
-		t.Fatalf("实时领取不应拿到 digest 渠道的投递，得到 %d 条", len(left))
+		t.Fatalf("실시간 수집은 digest 채널을 통해 전달되어서는 안되지만, %d를 통해 전달되어야 합니다.", len(left))
 	}
 }
 
-// TestClaimExpiredLeaseRecovers 覆盖崩溃自愈：进程在投递途中挂掉会留下 sending
-// 行，租约到期后必须能被重新领起来，否则这条投递永远卡住。
+// TestClaimExpiredLeaseRecovers 충돌 자가 치유를 포함합니다. 배송 중에 프로세스가 중단되면 sending가 남게 됩니다.
+// 알겠습니다. 임대 기간이 만료된 후 다시 수령해야 합니다. 그렇지 않으면 배송이 영원히 중단됩니다.
 func TestClaimExpiredLeaseRecovers(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
@@ -288,9 +288,9 @@ func TestClaimExpiredLeaseRecovers(t *testing.T) {
 	}
 	first, err := d.ClaimRealtimeDeliveries(ctx, ch.ID, 10, time.Minute)
 	if err != nil || len(first) != 1 {
-		t.Fatalf("首次领取失败: %v (%d 条)", err, len(first))
+		t.Fatalf("처음 수집 실패: %v(%d)", err, len(first))
 	}
-	// 把租约手动推到过去，模拟「租约已过期」。
+	// 임대를 수동으로 과거로 푸시하여 "임대가 만료되었습니다"를 시뮬레이션합니다.
 	if _, err := d.Exec(`UPDATE notification_deliveries SET next_attempt_at = now() - interval '1 minute' WHERE id=$1`, first[0].ID); err != nil {
 		t.Fatal(err)
 	}
@@ -299,10 +299,10 @@ func TestClaimExpiredLeaseRecovers(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(second) != 1 {
-		t.Fatalf("租约过期的 sending 行应可被重新领取，得到 %d 条", len(second))
+		t.Fatalf("임대가 만료된 sending 행을 회수하고 %d 행을 가져와야 합니다.", len(second))
 	}
 	if second[0].Attempts != 2 {
-		t.Fatalf("重新领取应累加尝试次数，得到 %d", second[0].Attempts)
+		t.Fatalf("%d를 획득하려면 회수 시도 횟수가 누적되어야 합니다.", second[0].Attempts)
 	}
 }
 
@@ -314,7 +314,7 @@ func TestClaimSkipsDisabledChannel(t *testing.T) {
 	if _, _, err := d.FanOutPendingEvents(ctx, 100); err != nil {
 		t.Fatal(err)
 	}
-	// 停用会把存量待发投递一起标记为 skipped。
+	// 비활성화하면 배송 대기 중인 재고가 skipped로 표시됩니다.
 	if err := d.SetNotificationChannelEnabled(ctx, ch.ID, false); err != nil {
 		t.Fatal(err)
 	}
@@ -323,14 +323,14 @@ func TestClaimSkipsDisabledChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	if state != NotifyStateSkipped {
-		t.Fatalf("停用渠道的存量待发投递应被标记为 skipped，得到 %s", state)
+		t.Fatalf("비활성화된 채널의 인벤토리는 skipped로 표시되어야 하며 결과적으로 %s가 됩니다.", state)
 	}
 	got, err := d.ClaimRealtimeDeliveries(ctx, ch.ID, 10, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 0 {
-		t.Fatalf("已停用渠道不应能被领取，得到 %d 条", len(got))
+		t.Fatalf("비활성화된 채널은 소유권을 주장해서는 안 되며 %d 항목을 받아야 합니다.", len(got))
 	}
 }
 
@@ -345,16 +345,16 @@ func TestDigestBatchDueAndStableBatchID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 批次刚建、年龄为 0，30 分钟的周期下不该到期。
+	// 배치가 방금 생성되었고 기간은 0이며 30분 주기 이내에 만료되어서는 안 됩니다.
 	due, err := d.DigestBatchDue(ctx, ch.ID, 30*time.Minute)
 	if err != nil {
-		t.Fatalf("判断批次到期失败: %v", err)
+		t.Fatalf("배치 만료 확인 실패: %v", err)
 	}
 	if due {
-		t.Fatal("刚建立的批次不应立即到期")
+		t.Fatal("새로 생성된 배치는 즉시 만료되어서는 안 됩니다.")
 	}
 
-	// 把三条投递的创建时间一起推老，模拟一个攒够周期的批次。
+	// 누적 기간이 충분한 배치를 시뮬레이션하려면 세 배송의 생성 시간을 함께 미십시오.
 	if _, err := d.Exec(`UPDATE notification_deliveries SET created_at = now() - interval '40 minutes' WHERE channel_id=$1`, ch.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -363,40 +363,40 @@ func TestDigestBatchDueAndStableBatchID(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !due {
-		t.Fatal("超过周期的批次应判定为到期")
+		t.Fatal("주기를 초과하는 배치는 만료된 것으로 판단되어야 합니다.")
 	}
 
 	batch, err := d.ClaimDigestBatch(ctx, ch.ID, MaxDigestBatchSize, time.Minute)
 	if err != nil {
-		t.Fatalf("领取汇总批次失败: %v", err)
+		t.Fatalf("요약 배치 수신 실패: %v", err)
 	}
 	if len(batch) != 3 {
-		t.Fatalf("汇总应一次领走全部 3 条，得到 %d 条", len(batch))
+		t.Fatalf("정리하자면, 아이템 3개를 모두 한꺼번에 모아야 하며, %d 아이템을 획득해야 합니다.", len(batch))
 	}
 	if batch[0].BatchID == nil {
-		t.Fatal("汇总批次必须写 batch_id，否则历史里看不出这几条是一起发的")
+		t.Fatal("요약 배치는 batch_id로 작성되어야 하며, 그렇지 않으면 해당 항목이 함께 발행된 기록에 표시되지 않습니다.")
 	}
 	firstBatchID := *batch[0].BatchID
 	for _, dl := range batch {
 		if dl.BatchID == nil || *dl.BatchID != firstBatchID {
-			t.Fatalf("同一批次应共享 batch_id，得到 %v vs %d", dl.BatchID, firstBatchID)
+			t.Fatalf("동일한 배치는 batch_id를 공유하고 %v vs %d를 가져와야 합니다.", dl.BatchID, firstBatchID)
 		}
 	}
 
-	// 让这批**整体**失败重排后再领，batch_id 必须保持原值（COALESCE 的作用）：
-	// 否则一次重试就把「这批是一起发的」这个事实抹掉了。
+	// 이 **전체** 배치가 실패하고 이를 받기 전에 재배열되도록 하세요. batch_id는 원래 값을 유지해야 합니다(COALESCE의 역할).
+	// 그렇지 않으면 한 번 재시도하면 "이 일괄 처리가 함께 전송되었습니다"라는 사실이 지워집니다.
 	//
-	// 必须整批重排而不是只重排一条——投递引擎发汇总消息时就是这样处理的
-	// （一条消息代表整批，成败与共）。只重排一条的话，其余仍在租约期内，
-	// 重领自然只拿到那一条。
+	// 하나가 아닌 전체 배치를 다시 정렬해야 합니다. 이는 요약 메시지를 보낼 때 전달 엔진이 배치를 처리하는 방식입니다.
+	// (하나의 메시지는 전체 배치를 나타내며 성공 또는 실패가 공유됩니다.) 한 품목만 일정을 변경하더라도 나머지 품목은 여전히 ​​임대 기간 내에 있습니다.
+	// 당연히 칭호를 다시 얻으면 그 아이템 하나만 얻게 됩니다.
 	allIDs := make([]int64, 0, len(batch))
 	for _, dl := range batch {
 		allIDs = append(allIDs, dl.ID)
 	}
-	if err := d.RescheduleDeliveries(ctx, allIDs, time.Second, "模拟失败"); err != nil {
+	if err := d.RescheduleDeliveries(ctx, allIDs, time.Second, "시뮬레이션 실패"); err != nil {
 		t.Fatal(err)
 	}
-	// 把租约推到过去，模拟退避时间已到。
+	// 임대를 과거로 푸시하고 백오프 시간이 만료되었는지 시뮬레이션합니다.
 	if _, err := d.Exec(`UPDATE notification_deliveries SET next_attempt_at = now() - interval '1 minute' WHERE channel_id=$1`, ch.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -405,10 +405,10 @@ func TestDigestBatchDueAndStableBatchID(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(reclaimed) != 3 {
-		t.Fatalf("重领应拿到全部 3 条，得到 %d", len(reclaimed))
+		t.Fatalf("회수는 3개 항목을 모두 얻고 %d를 받아야 합니다.", len(reclaimed))
 	}
 	if reclaimed[0].BatchID == nil || *reclaimed[0].BatchID != firstBatchID {
-		t.Fatalf("重试后 batch_id 应保持原值 %d，得到 %v", firstBatchID, reclaimed[0].BatchID)
+		t.Fatalf("재시도 후 batch_id는 원래 값 %d를 유지하고 %v를 가져와야 합니다.", firstBatchID, reclaimed[0].BatchID)
 	}
 }
 
@@ -422,34 +422,34 @@ func TestDeliveryStateTransitions(t *testing.T) {
 	}
 	got, err := d.ClaimRealtimeDeliveries(ctx, ch.ID, 10, time.Minute)
 	if err != nil || len(got) != 1 {
-		t.Fatalf("领取失败: %v (%d)", err, len(got))
+		t.Fatalf("수집 실패: %v(%d)", err, len(got))
 	}
 	id := got[0].ID
 
-	if err := d.RescheduleDeliveries(ctx, []int64{id}, time.Second, "网络抖动"); err != nil {
+	if err := d.RescheduleDeliveries(ctx, []int64{id}, time.Second, "네트워크 지터"); err != nil {
 		t.Fatal(err)
 	}
 	var state, lastErr string
 	if err := d.QueryRow(`SELECT state, last_error FROM notification_deliveries WHERE id=$1`, id).Scan(&state, &lastErr); err != nil {
 		t.Fatal(err)
 	}
-	if state != NotifyStatePending || lastErr != "网络抖动" {
-		t.Fatalf("重排后应为 pending 并记录原因，得到 state=%s err=%q", state, lastErr)
+	if state != NotifyStatePending || lastErr != "네트워크 지터" {
+		t.Fatalf("재배열 후에는 pending여야 하며 state=%s err=%q를 얻는 이유를 기록해야 합니다.", state, lastErr)
 	}
 
-	if err := d.FailDeliveries(ctx, []int64{id}, "重试耗尽"); err != nil {
+	if err := d.FailDeliveries(ctx, []int64{id}, "소진된 재시도"); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.QueryRow(`SELECT state FROM notification_deliveries WHERE id=$1`, id).Scan(&state); err != nil {
 		t.Fatal(err)
 	}
 	if state != NotifyStateFailed {
-		t.Fatalf("应为 failed，得到 %s", state)
+		t.Fatalf("failed를 예상했지만 %s를 얻었습니다.", state)
 	}
 
-	// 手动重发要清零重试计数并立即到期，否则会继承旧的失败预算。
+	// 수동 재전송은 재시도 횟수를 지우고 즉시 만료되어야 합니다. 그렇지 않으면 이전 실패 예산이 상속됩니다.
 	if err := d.RetryNotificationDelivery(ctx, id); err != nil {
-		t.Fatalf("重发失败: %v", err)
+		t.Fatalf("재전송 실패: %v", err)
 	}
 	var attempts int
 	var next time.Time
@@ -457,18 +457,18 @@ func TestDeliveryStateTransitions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if state != NotifyStatePending || attempts != 0 {
-		t.Fatalf("重发后应为 pending 且 attempts=0，得到 state=%s attempts=%d", state, attempts)
+		t.Fatalf("다시 보낸 후에는 pending 및 attempts=0이어야 하며 state=%s attempts=%d를 받아야 합니다.", state, attempts)
 	}
 	if next.After(time.Now().Add(time.Second)) {
-		t.Fatal("重发应立即可领")
+		t.Fatal("재전송이 즉시 가능해야 합니다.")
 	}
 
-	// 已送达的投递不应能被重发。
+	// 배송된 배송물은 다시 보내서는 안 됩니다.
 	if err := d.MarkDeliveriesSent(ctx, []int64{id}); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.RetryNotificationDelivery(ctx, id); err == nil {
-		t.Fatal("已送达的投递不该允许重发")
+		t.Fatal("배송된 상품은 재전송이 허용되지 않습니다.")
 	}
 }
 
@@ -477,7 +477,7 @@ func TestListNotificationDeliveriesPagingAndFilter(t *testing.T) {
 	ctx := context.Background()
 	ch := newTestChannel(t, d, notify.KindDingTalk, NotifyModeRealtime, `{}`)
 	for i := 0; i < 5; i++ {
-		addTestEvent(t, d, notify.EventFindingCreated, int64(8000+i), notify.Snapshot{Severity: "high", Name: "分页测试"})
+		addTestEvent(t, d, notify.EventFindingCreated, int64(8000+i), notify.Snapshot{Severity: "high", Name: "페이지 매김 테스트"})
 	}
 	if _, _, err := d.FanOutPendingEvents(ctx, 100); err != nil {
 		t.Fatal(err)
@@ -488,34 +488,34 @@ func TestListNotificationDeliveriesPagingAndFilter(t *testing.T) {
 
 	page1, total, err := d.ListNotificationDeliveries(ctx, NotificationDeliveryFilter{ChannelID: ch.ID, State: NotifyStateSending}, 1, 2)
 	if err != nil {
-		t.Fatalf("查询失败: %v", err)
+		t.Fatalf("쿼리 실패: %v", err)
 	}
 	if total != 5 {
-		t.Fatalf("总数应为 5，得到 %d", total)
+		t.Fatalf("총합은 5가 되어야 %d가 됩니다.", total)
 	}
 	if len(page1) != 2 {
-		t.Fatalf("每页 2 条，得到 %d", len(page1))
+		t.Fatalf("페이지당 항목 2개, %d 받기", len(page1))
 	}
-	// 新的在前：第一页首条 id 应大于第二页首条。
+	// 새로운 첫 번째: 첫 번째 페이지의 첫 번째 항목인 id는 두 번째 페이지의 첫 번째 항목보다 커야 합니다.
 	page2, _, err := d.ListNotificationDeliveries(ctx, NotificationDeliveryFilter{ChannelID: ch.ID, State: NotifyStateSending}, 2, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(page2) != 2 || page2[0].ID >= page1[0].ID {
-		t.Fatalf("分页顺序应为新的在前，得到 page1[0]=%d page2[0]=%d", page1[0].ID, page2[0].ID)
+		t.Fatalf("페이징 순서는 먼저 새로운 것이어야 하며 page1[0]=%d page2[0]=%d를 얻습니다.", page1[0].ID, page2[0].ID)
 	}
-	// 渲染上下文必须随历史一起返回，否则列表无法展示「推的是什么」。
+	// 렌더링 컨텍스트는 기록과 함께 반환되어야 합니다. 그렇지 않으면 목록에 "푸시된 내용"이 표시될 수 없습니다.
 	if page1[0].ChannelName == "" || page1[0].FindingID == 0 {
-		t.Fatalf("历史项缺少展示字段: %+v", page1[0])
+		t.Fatalf("기록 항목에 표시 필드가 없습니다: %+v", page1[0])
 	}
 
-	// 按状态过滤：没有 pending 的。
+	// 상태별 필터링: pending의 경우 없음.
 	pending, totalPending, err := d.ListNotificationDeliveries(ctx, NotificationDeliveryFilter{ChannelID: ch.ID, State: NotifyStatePending}, 1, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if totalPending != 0 || len(pending) != 0 {
-		t.Fatalf("不该有 pending 投递，得到 %d 条 (total=%d)", len(pending), totalPending)
+		t.Fatalf("게시된 pending가 없어야 하는데 %d를 획득했습니다. (total=%d)", len(pending), totalPending)
 	}
 }
 
@@ -523,80 +523,80 @@ func TestSetFindingStatusWithNotifyOnlyEmitsOnRealChange(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
 
-	tk, err := d.CreateTask("通知状态变更测试", "目标", nil, 0, 0)
+	tk, err := d.CreateTask("알림 상태 변경 테스트", "목표", nil, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer d.DeleteTask(tk.ID)
 	es := d.Exploration(tk.ExplorationID)
 	f, err := es.RecordFinding(ctx, RecordFindingInput{
-		TaskID: tk.ID, Worker: "test", VulnClass: "SQL注入", Name: "状态变更用例",
-		Severity: "high", Summary: "摘要",
+		TaskID: tk.ID, Worker: "test", VulnClass: "SQL 주입", Name: "상태 변경 사용 사례",
+		Severity: "high", Summary: "요약",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Exec(`DELETE FROM notification_events WHERE finding_id=$1`, f.FindingID) })
 
-	// 落库时已登记一条 finding_created 事件，先把它数出来作为基线。
+	// finding_created 이벤트가 라이브러리에 놓였을 때 등록되었습니다. 먼저 이를 기준으로 계산합니다.
 	var base int
 	if err := d.QueryRow(`SELECT count(*) FROM notification_events WHERE finding_id=$1`, f.FindingID).Scan(&base); err != nil {
 		t.Fatal(err)
 	}
 	if base < 1 {
-		t.Fatal("漏洞落库应在同一事务里登记一条推送事件")
+		t.Fatal("취약점 데이터베이스는 동일한 트랜잭션에 푸시 이벤트를 등록해야 합니다.")
 	}
 
-	// 改成同一个状态：不该产生事件（避免重复提交刷出推送噪音）。
+	// 동일한 상태로 변경: 이벤트가 생성되지 않아야 합니다(반복적인 제출 및 푸시 노이즈를 방지하기 위해).
 	from, found, notified, err := d.SetFindingStatusWithNotify(ctx, f.FindingID, "pending")
 	if err != nil || !found {
-		t.Fatalf("状态设置失败: found=%v err=%v", found, err)
+		t.Fatalf("상태 설정 실패: found=%v err=%v", found, err)
 	}
 	if notified {
-		t.Fatal("状态未变化时不应登记推送事件")
+		t.Fatal("상태가 변경되지 않은 경우 푸시 이벤트를 등록하면 안 됩니다.")
 	}
 	if from != "pending" {
-		t.Fatalf("应返回变更前状态 pending，得到 %q", from)
+		t.Fatalf("변경 전 상태 pending로 돌아가서 %q를 얻어야 합니다.", from)
 	}
 
-	// 真正变更：应登记事件并记录 from/to。
+	// 실제 변경: 이벤트가 from/to에 등록되고 기록되어야 합니다.
 	from, found, notified, err = d.SetFindingStatusWithNotify(ctx, f.FindingID, "fixed")
 	if err != nil || !found {
-		t.Fatalf("状态设置失败: found=%v err=%v", found, err)
+		t.Fatalf("상태 설정 실패: found=%v err=%v", found, err)
 	}
 	if !notified {
-		t.Fatal("状态实际变更时应登记推送事件")
+		t.Fatal("푸시 이벤트는 상태가 실제로 변경될 때 등록되어야 합니다.")
 	}
 	if from != "pending" {
-		t.Fatalf("from 应为 pending，得到 %q", from)
+		t.Fatalf("from는 pending여야 하며, %q를 얻으세요.", from)
 	}
 	var snapshot []byte
 	if err := d.QueryRow(`SELECT snapshot FROM notification_events WHERE finding_id=$1 AND kind=$2`,
 		f.FindingID, notify.EventFindingStatusChanged).Scan(&snapshot); err != nil {
-		t.Fatalf("未找到状态变更事件: %v", err)
+		t.Fatalf("상태 변경 이벤트를 찾을 수 없습니다: %v", err)
 	}
 	var snap notify.Snapshot
 	if err := json.Unmarshal(snapshot, &snap); err != nil {
 		t.Fatal(err)
 	}
 	if snap.FromStatus != "pending" || snap.ToStatus != "fixed" {
-		t.Fatalf("快照里的状态流转不对: %s → %s", snap.FromStatus, snap.ToStatus)
+		t.Fatalf("스냅샷의 상태 흐름이 올바르지 않습니다: %s → %s", snap.FromStatus, snap.ToStatus)
 	}
-	// 快照要带上渲染所需字段，否则状态变更消息会是空壳。
-	if snap.VulnClass != "SQL注入" || snap.Severity != "high" || snap.Name != "状态变更用例" {
-		t.Fatalf("快照缺少渲染字段: %+v", snap)
+	// 스냅샷은 렌더링에 필요한 필드를 가져와야 합니다. 그렇지 않으면 상태 변경 메시지가 빈 셸이 됩니다.
+	if snap.VulnClass != "SQL 주입" || snap.Severity != "high" || snap.Name != "상태 변경 사용 사례" {
+		t.Fatalf("스냅샷에 렌더링 필드가 없습니다: %+v", snap)
 	}
 	var status string
 	if err := d.QueryRow(`SELECT status FROM findings WHERE id=$1`, f.FindingID).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
 	if status != "fixed" {
-		t.Fatalf("状态应已更新为 fixed，得到 %s", status)
+		t.Fatalf("상태가 fixed로 업데이트되어야 합니다. %s를 얻으세요.", status)
 	}
 
-	// 不存在的漏洞：found=false，不报错。
+	// 존재하지 않는 취약점: found=false, 오류가 보고되지 않습니다.
 	if _, found, _, err := d.SetFindingStatusWithNotify(ctx, 999999999, "fixed"); err != nil || found {
-		t.Fatalf("不存在的漏洞应返回 found=false 且无错，得到 found=%v err=%v", found, err)
+		t.Fatalf("존재하지 않는 취약점은 found=false를 반환하고 오류 없이 found=%v err=%v를 반환해야 합니다.", found, err)
 	}
 }
 
@@ -610,17 +610,17 @@ func TestNotificationStatsSnapshot(t *testing.T) {
 	}
 	stats, err := d.NotificationStatsSnapshot(ctx)
 	if err != nil {
-		t.Fatalf("统计失败: %v", err)
+		t.Fatalf("통계 실패: %v", err)
 	}
 	if stats.Channels < 1 || stats.ChannelsOn < 1 {
-		t.Fatalf("渠道计数不对: %+v", stats)
+		t.Fatalf("잘못된 채널 수: %+v", stats)
 	}
 	if stats.Pending < 1 {
-		t.Fatalf("应统计到待发投递: %+v", stats)
+		t.Fatalf("계산되어 배송 준비가 완료되어야 함: %+v", stats)
 	}
-	// 刚建的投递积压年龄应接近 0，而不是负数或巨大值。
+	// 새로 생성된 배달 백로그 기간은 음수이거나 거대하지 않고 0에 가까워야 합니다.
 	if stats.BacklogAgeMS < 0 || stats.BacklogAgeMS > int64(time.Hour/time.Millisecond) {
-		t.Fatalf("积压年龄不合法: %d ms", stats.BacklogAgeMS)
+		t.Fatalf("백로그 기간이 잘못되었습니다: %d ms", stats.BacklogAgeMS)
 	}
 	_ = ch
 }
@@ -630,7 +630,7 @@ func TestNotificationChannelCRUDRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	ch := &NotificationChannel{
-		Name:       "CRUD 往返",
+		Name:       "CRUD 왕복",
 		Kind:       notify.KindEmail,
 		Mode:       NotifyModeDigest,
 		Config:     json.RawMessage(`{"host":"smtp.example.com","port":587,"from":"a@b.c","to":["x@y.z"]}`),
@@ -639,37 +639,37 @@ func TestNotificationChannelCRUDRoundTrip(t *testing.T) {
 	}
 	id, err := d.SaveNotificationChannel(ctx, ch)
 	if err != nil {
-		t.Fatalf("新建失败: %v", err)
+		t.Fatalf("새로 생성 실패: %v", err)
 	}
 	t.Cleanup(func() { d.Exec(`DELETE FROM notification_channels WHERE id=$1`, id) })
 
 	got, err := d.NotificationChannelByID(ctx, id)
 	if err != nil {
-		t.Fatalf("读取失败: %v", err)
+		t.Fatalf("읽기 실패: %v", err)
 	}
-	if got.Mode != NotifyModeDigest || got.RatePerMin != 42 || got.Name != "CRUD 往返" {
-		t.Fatalf("往返字段不一致: %+v", got)
+	if got.Mode != NotifyModeDigest || got.RatePerMin != 42 || got.Name != "CRUD 왕복" {
+		t.Fatalf("왕복 필드 불일치: %+v", got)
 	}
 	if !got.IsEnabled() {
-		t.Fatal("默认应为启用")
+		t.Fatal("기본값은 활성화되어야 합니다.")
 	}
 	var cfg map[string]any
 	if err := json.Unmarshal(got.Config, &cfg); err != nil {
 		t.Fatal(err)
 	}
 	if cfg["host"] != "smtp.example.com" {
-		t.Fatalf("配置未正确落库: %v", cfg)
+		t.Fatalf("구성이 라이브러리에 올바르게 삭제되지 않았습니다: %v", cfg)
 	}
 	var filter notify.Filter
 	if err := json.Unmarshal(got.Filter, &filter); err != nil {
 		t.Fatal(err)
 	}
 	if filter.MinSeverity != "medium" || !filter.OnStatusChange {
-		t.Fatalf("过滤条件未正确落库: %+v", filter)
+		t.Fatalf("필터 조건이 라이브러리에 올바르게 입력되지 않았습니다: %+v", filter)
 	}
 
-	// 更新后再读。
-	got.Name = "改名了"
+	// 업데이트 후 다시 읽어보세요.
+	got.Name = "이름이 변경됨"
 	off := false
 	got.Enabled = &off
 	if _, err := d.SaveNotificationChannel(ctx, got); err != nil {
@@ -679,37 +679,37 @@ func TestNotificationChannelCRUDRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Name != "改名了" || after.IsEnabled() {
-		t.Fatalf("更新未生效: %+v", after)
+	if after.Name != "이름이 변경됨" || after.IsEnabled() {
+		t.Fatalf("업데이트가 적용되지 않음: %+v", after)
 	}
 
-	// 删除后应报「不存在」而不是静默成功。
+	// 삭제 후에는 자동 성공 대신 "존재하지 않음"이 보고되어야 합니다.
 	if err := d.DeleteNotificationChannel(ctx, id); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.NotificationChannelByID(ctx, id); err != ErrNotificationChannelNotFound {
-		t.Fatalf("期望 ErrNotificationChannelNotFound，得到 %v", err)
+		t.Fatalf("ErrNotificationChannelNotFound를 예상했지만 %v를 얻었습니다.", err)
 	}
 	if err := d.DeleteNotificationChannel(ctx, id); err != ErrNotificationChannelNotFound {
-		t.Fatalf("重复删除应报不存在，得到 %v", err)
+		t.Fatalf("중복삭제신고가 존재하지 않으며, %v를 취득하였습니다.", err)
 	}
 }
 
-// TestSaveNotificationChannelKeepsExplicitZeroRate 锁住一个曾经写错的地方：
-// **0 是合法配置，含义是「不限流」，不能被 db 层当成「未指定」覆盖成默认值**。
+// TestSaveNotificationChannelKeepsExplicitZeroRate는 잘못 작성된 장소를 잠급니다.
+// **0은 유효한 구성으로, "현재 제한 없음"을 의미하며 db 레이어에서 "지정되지 않음"으로 기본값으로 재정의될 수 없습니다**.
 //
-// 历史 bug：SaveNotificationChannel 里写了 `if RatePerMin <= 0 { 取默认值 }`，
-// 于是文档、UI 提示、takeTokens 都按「0=不限流」解释，唯独写库这一层悄悄改成
-// 20（钉钉/企微/Telegram）或 100（飞书）——操作者以为放开了限流、实际被卡着，
-// 而且没有任何提示。「未指定」与「显式 0」的区别只有请求体能表达，
-// 所以默认值在 server 层填（见 notifyCreateChannel），db 层只管存。
+// 내역 bug: `if RatePerMin <= 0 { 기본값을 사용하세요. }`는 SaveNotificationChannel로 작성되었으며,
+// 따라서 문서, UI 프롬프트, takeTokens는 모두 "0 = 현재 제한 없음"으로 해석되지만 쓰기 라이브러리 레이어는 조용히 다음으로 변경되었습니다.
+// 20(DingTalk/Qiwei/Telegram) 또는 100(Feishu) - 운영자는 현재 제한이 해제된 것으로 생각했지만 실제로는 중단되었습니다.
+// 그리고 힌트도 없습니다. "지정되지 않음"과 "명시적 0"의 차이는 요청 본문으로만 표현됩니다.
+// 따라서 server 레이어(notifyCreateChannel 참조)에는 기본값이 채워지고, db 레이어는 스토리지만 관리하게 된다.
 func TestSaveNotificationChannelKeepsExplicitZeroRate(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
 
-	// 显式 0（不限流）：必须原样存下来。
+	// 명시적 0(현재 제한 없음): 있는 그대로 저장해야 합니다.
 	unlimited := &NotificationChannel{
-		Name: "不限流", Kind: notify.KindDingTalk, RatePerMin: 0,
+		Name: "현재 제한 없음", Kind: notify.KindDingTalk, RatePerMin: 0,
 		Config: json.RawMessage(`{"webhook":"https://example.com/h"}`),
 	}
 	id, err := d.SaveNotificationChannel(ctx, unlimited)
@@ -722,24 +722,24 @@ func TestSaveNotificationChannelKeepsExplicitZeroRate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.RatePerMin != 0 {
-		t.Fatalf("显式 0 表示不限流，必须原样保存，得到 %d", got.RatePerMin)
+		t.Fatalf("명시적 0은 전류 제한이 없음을 의미하며 그대로 저장해야 하므로 %d가 발생합니다.", got.RatePerMin)
 	}
 	if got.Mode != NotifyModeRealtime {
-		t.Fatalf("默认模式应为 realtime，得到 %s", got.Mode)
+		t.Fatalf("기본 모드는 realtime여야 하며, %s를 가져옵니다.", got.Mode)
 	}
 
-	// 负值是非法输入，应被拒绝而不是悄悄改成别的值。
+	// 음수 값은 잘못된 입력이므로 조용히 다른 값으로 변경하기보다는 거부해야 합니다.
 	bad := &NotificationChannel{
-		Name: "负限流", Kind: notify.KindDingTalk, RatePerMin: -1,
+		Name: "음의 전류 제한", Kind: notify.KindDingTalk, RatePerMin: -1,
 		Config: json.RawMessage(`{"webhook":"https://example.com/h"}`),
 	}
 	if _, err := d.SaveNotificationChannel(ctx, bad); err == nil {
-		t.Fatal("负限流应被拒绝")
+		t.Fatal("음의 전류 제한은 거부되어야 합니다.")
 	}
 }
 
-// TestDeleteChannelCascadesDeliveries 锁住外键行为：渠道删除后其投递历史一并消失
-// （配置都没了，历史无从解读），但事件本身要留下——它可能还被别的渠道引用。
+// TestDeleteChannelCascadesDeliveries 외래 키 잠금 동작: 채널이 삭제되면 전송 기록이 사라집니다.
+// (구성이 없어져 기록을 해석할 수 없습니다.) 하지만 이벤트 자체는 남아 있어야 합니다. 다른 채널에서 인용될 수 있습니다.
 func TestDeleteChannelCascadesDeliveries(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
@@ -753,7 +753,7 @@ func TestDeleteChannelCascadesDeliveries(t *testing.T) {
 		t.Fatal(err)
 	}
 	if before == 0 {
-		t.Fatal("前置条件不成立：未产生投递")
+		t.Fatal("전제조건이 충족되지 않음: 배송이 발생하지 않음")
 	}
 	if err := d.DeleteNotificationChannel(ctx, ch.ID); err != nil {
 		t.Fatal(err)
@@ -763,20 +763,20 @@ func TestDeleteChannelCascadesDeliveries(t *testing.T) {
 		t.Fatal(err)
 	}
 	if after != 0 {
-		t.Fatalf("渠道删除后其投递应级联删除，仍有 %d 条", after)
+		t.Fatalf("채널이 삭제된 후 해당 전달은 캐스케이드에서 삭제되어야 하며 여전히 %d가 있습니다.", after)
 	}
 	var evExists bool
 	if err := d.QueryRow(`SELECT EXISTS(SELECT 1 FROM notification_events WHERE id=$1)`, ev).Scan(&evExists); err != nil {
 		t.Fatal(err)
 	}
 	if !evExists {
-		t.Fatal("删渠道不应连带删除事件本身")
+		t.Fatal("채널을 삭제해도 이벤트 자체도 삭제되어서는 안 됩니다.")
 	}
 }
 
-// TestClaimDigestBatchHonorsCallerLimit 覆盖审计指出的一处口子：
-// 汇总渠道此前完全绕过令牌桶——allow 被 takeTokens 扣掉却没人用，
-// rate_per_min 对 digest 模式毫无作用。现在 limit 也参与约束。
+// TestClaimDigestBatchHonorsCallerLimit 커버리지 감사에서 지적된 결함:
+// 집계 채널은 이전에 토큰 버킷을 완전히 우회했습니다. allow는 takeTokens에 의해 공제되었지만 아무도 이를 사용하지 않았습니다.
+// rate_per_min는 digest 모드에 영향을 주지 않습니다. 이제 limit도 제약 조건에 참여합니다.
 func TestClaimDigestBatchHonorsCallerLimit(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
@@ -787,62 +787,62 @@ func TestClaimDigestBatchHonorsCallerLimit(t *testing.T) {
 	if _, _, err := d.FanOutPendingEvents(ctx, 100); err != nil {
 		t.Fatal(err)
 	}
-	// 取 limit=3：只能领到 3 条，其余留在库里。
+	// limit=3을 사용하면 3개만 얻을 수 있고 나머지는 라이브러리에 보관할 수 있습니다.
 	got, err := d.ClaimDigestBatch(ctx, ch.ID, 3, time.Minute)
 	if err != nil {
-		t.Fatalf("领取失败: %v", err)
+		t.Fatalf("수신 실패: %v", err)
 	}
 	if len(got) != 3 {
-		t.Fatalf("应按调用方限流额度只领 3 条，得到 %d", len(got))
+		t.Fatalf("발신자의 현재 한도에 따라 아이템 3개만 받아야 하며, %d를 받아야 합니다.", len(got))
 	}
-	// limit=0 表示本轮额度用尽：一条都不该领，也不该报错。
+	// limit=0은 이 라운드의 할당량이 소진되었음을 의미합니다. 누구도 요청해서는 안 되며 오류도 보고되어서는 안 됩니다.
 	if got, err := d.ClaimDigestBatch(ctx, ch.ID, 0, time.Minute); err != nil || len(got) != 0 {
-		t.Fatalf("额度为 0 时应领 0 条且不报错，得到 %d 条 err=%v", len(got), err)
+		t.Fatalf("할당량이 0이면 0개 항목을 수집해야 하며 오류가 보고되지 않고 %d 항목을 얻습니다. err=%v", len(got), err)
 	}
 }
 
-// TestFinishFindingRetestEmitsStatusChange 覆盖审计指出的一处完整性缺口：
-// 复测结论为「已修复」时，状态确实变了，但那条 UPDATE 是直接写库的、
-// 绕过了带通知的版本——于是配了 on_status_change 的渠道对这种状态流转
-// 完全收不到推送，界面上状态悄悄变了，运维要打开平台才知道。
+// TestFinishFindingRetestEmitsStatusChange 감사를 통해 확인된 무결성 격차 범위:
+// 재테스트 결론이 "수정"되면 실제로 상태가 변경되었지만 UPDATE가 라이브러리에 직접 기록되었습니다.
+// 알림이 포함된 버전 우회 - 따라서 on_status_change 채널은 이 상태를 순환하도록 구성됩니다.
+// 푸시 알림도 전혀 받을 수 없었고, 인터페이스 상태도 조용히 바뀌었습니다. 운영과 유지보수는 플랫폼을 열어서 알아내야 했습니다.
 //
-// 这条用例锁住「所有改状态的路径都要登记状态变更事件」。
+// 이 사용 사례는 "상태를 변경하는 모든 경로는 상태 변경 이벤트를 등록해야 함"을 잠급니다.
 func TestFinishFindingRetestEmitsStatusChange(t *testing.T) {
 	d := notifyTestDB(t)
 	ctx := context.Background()
 
-	tk, err := d.CreateTask("复测推送测试", "目标", nil, 0, 0)
+	tk, err := d.CreateTask("푸시 테스트 다시 테스트", "목표", nil, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer d.DeleteTask(tk.ID)
 	es := d.Exploration(tk.ExplorationID)
 	f, err := es.RecordFinding(ctx, RecordFindingInput{
-		TaskID: tk.ID, Worker: "test", VulnClass: "SQL注入", Name: "复测目标",
-		Severity: "high", Summary: "摘要",
+		TaskID: tk.ID, Worker: "test", VulnClass: "SQL 주입", Name: "재테스트 목표",
+		Severity: "high", Summary: "요약",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Exec(`DELETE FROM notification_events WHERE finding_id=$1`, f.FindingID) })
 
-	// 建一条复测记录并直接推到完成态。
-	rt, _, _, err := d.CreateFindingRetest(ctx, f.FindingID, "复核")
+	// 재테스트 기록을 생성하고 완료 상태로 직접 푸시합니다.
+	rt, _, _, err := d.CreateFindingRetest(ctx, f.FindingID, "검토")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if rt.ConversationID == nil {
-		t.Fatal("复测应关联一个会话")
+		t.Fatal("재테스트는 세션과 연결되어야 합니다.")
 	}
-	// 复测必须先进入 running 才能落结论（与真实流程一致）。
+	// 재테스트에서는 먼저 running를 입력하여 결론을 도출해야 합니다(실제 프로세스와 일치).
 	if ok, err := d.StartFindingRetest(ctx, rt.ID); err != nil || !ok {
-		t.Fatalf("启动复测失败: ok=%v err=%v", ok, err)
+		t.Fatalf("재테스트 시작 실패: ok=%v err=%v", ok, err)
 	}
-	if err := d.RecordFindingRetestResult(ctx, *rt.ConversationID, "fixed", "已修复", "证据"); err != nil {
+	if err := d.RecordFindingRetestResult(ctx, *rt.ConversationID, "fixed", "수정됨", "증거"); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.FinishFindingRetest(rt.ID, "completed", ""); err != nil {
-		t.Fatalf("结束复测失败: %v", err)
+		t.Fatalf("재테스트 종료 실패: %v", err)
 	}
 
 	var status string
@@ -850,25 +850,25 @@ func TestFinishFindingRetestEmitsStatusChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	if status != FindingFixed {
-		t.Fatalf("复测判已修复后状态应为 fixed，得到 %s", status)
+		t.Fatalf("재테스트 결과 수리된 상태는 fixed여야 하며 %s를 획득한 것으로 확인되었습니다.", status)
 	}
 
-	// 关键断言：必须有一条状态变更事件，且 from/to 正确。
+	// 핵심 주장: 상태 변경 이벤트가 있어야 하며 from/to가 정확합니다.
 	var snapshot []byte
 	err = d.QueryRow(`SELECT snapshot FROM notification_events WHERE finding_id=$1 AND kind=$2 ORDER BY id DESC LIMIT 1`,
 		f.FindingID, notify.EventFindingStatusChanged).Scan(&snapshot)
 	if err != nil {
-		t.Fatalf("复测判已修复应登记状态变更推送事件（否则配了 on_status_change 的渠道收不到）: %v", err)
+		t.Fatalf("재테스트 결과 상태 변경 푸시 이벤트를 등록해야 하는 것으로 확인되었습니다. (그렇지 않으면 on_status_change가 장착된 채널은 이를 수신하지 않습니다.): %v", err)
 	}
 	var snap notify.Snapshot
 	if err := json.Unmarshal(snapshot, &snap); err != nil {
 		t.Fatal(err)
 	}
 	if snap.FromStatus != "pending" || snap.ToStatus != FindingFixed {
-		t.Fatalf("快照的状态流转不对: %s → %s", snap.FromStatus, snap.ToStatus)
+		t.Fatalf("스냅샷의 상태 흐름이 올바르지 않습니다: %s → %s", snap.FromStatus, snap.ToStatus)
 	}
-	// 快照要带渲染所需字段，否则推送出来是空壳。
-	if snap.Name != "复测目标" || snap.Severity != "high" {
-		t.Fatalf("快照缺少渲染字段: %+v", snap)
+	// 스냅샷에는 렌더링에 필요한 필드가 포함되어야 합니다. 그렇지 않으면 푸시될 때 빈 셸이 됩니다.
+	if snap.Name != "재테스트 목표" || snap.Severity != "high" {
+		t.Fatalf("스냅샷에 렌더링 필드가 없습니다: %+v", snap)
 	}
 }

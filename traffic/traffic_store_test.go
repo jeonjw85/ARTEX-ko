@@ -62,7 +62,7 @@ func onlyExchangeID(t *testing.T, tr *Traffic) string {
 	t.Helper()
 	var id string
 	if err := tr.DB().QueryRow(`SELECT id FROM exchanges`).Scan(&id); err != nil {
-		t.Fatalf("读取 exchange id: %v", err)
+		t.Fatalf("exchange id 읽기: %v", err)
 	}
 	return id
 }
@@ -75,11 +75,11 @@ func TestRecordKeepsBodiesInIndex(t *testing.T) {
 
 	tr.record(newFlow("api.example.com", "POST", "/v1/login",
 		[]byte(`{"user":"admin","password":"P@ssw0rd"}`),
-		[]byte(`{"token":"abc123","note":"内网测试账号"}`)))
+		[]byte(`{"token":"abc123","note":"인트라넷 테스트 계정"}`)))
 
 	// The URL-mirroring tree is gone: no host directory, no nested path segments.
 	if _, err := os.Stat(filepath.Join(dir, "api.example.com")); !os.IsNotExist(err) {
-		t.Fatalf("record 仍在磁盘上创建 host 目录（stat err=%v）", err)
+		t.Fatalf("record는 여전히 디스크에 host 디렉터리를 생성합니다(stat err=%v).", err)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -87,7 +87,7 @@ func TestRecordKeepsBodiesInIndex(t *testing.T) {
 	}
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), "_") {
-			t.Fatalf("data 目录下出现非内部目录 %q，说明仍在写文件树", e.Name())
+			t.Fatalf("내부가 아닌 디렉터리 %q는 data 디렉터리 아래에 나타나 파일 트리가 아직 작성 중임을 나타냅니다.", e.Name())
 		}
 	}
 
@@ -98,12 +98,12 @@ func TestRecordKeepsBodiesInIndex(t *testing.T) {
 	}
 	for _, want := range []string{"POST /v1/login HTTP/1.1", "Host: api.example.com", `"password":"P@ssw0rd"`} {
 		if !strings.Contains(req, want) {
-			t.Fatalf("请求原文缺少 %q，实际：\n%s", want, req)
+			t.Fatalf("원래 요청 텍스트에 %q가 없습니다. 실제: \n%s", want, req)
 		}
 	}
-	for _, want := range []string{"HTTP 200", `"token":"abc123"`, "内网测试账号"} {
+	for _, want := range []string{"HTTP 200", `"token":"abc123"`, "인트라넷 테스트 계정"} {
 		if !strings.Contains(resp, want) {
-			t.Fatalf("响应原文缺少 %q，实际：\n%s", want, resp)
+			t.Fatalf("원래 응답 텍스트에는 %q가 없습니다. 실제: \n%s", want, resp)
 		}
 	}
 }
@@ -114,39 +114,39 @@ func TestRecordKeepsBodiesInIndex(t *testing.T) {
 func TestFullTextSearchMatchesBodies(t *testing.T) {
 	tr, _ := openTraffic(t)
 	if !tr.fts {
-		t.Skip("驱动未启用 FTS5")
+		t.Skip("드라이버가 활성화되지 않음 FTS5")
 	}
 	const host = "api.example.com"
 	tr.record(newFlow(host, "POST", "/v1/login",
 		[]byte(`{"user":"admin","password":"P@ssw0rd"}`),
-		[]byte(`{"token":"abc123","note":"内网测试账号"}`)))
+		[]byte(`{"token":"abc123","note":"인트라넷 테스트 계정"}`)))
 	tr.record(newFlow(host, "GET", "/v1/health", nil, []byte(`{"status":"ok"}`)))
 
 	hits := func(term string) int {
 		t.Helper()
 		rows, err := tr.query(host, "", term, 0, 10)
 		if err != nil {
-			t.Fatalf("按正文搜索 %q 出错：%v", term, err)
+			t.Fatalf("텍스트로 검색 %q 오류: %v", term, err)
 		}
 		return len(rows)
 	}
 	if n := hits("password"); n != 1 {
-		t.Fatalf("搜 password 命中 %d 条，应为 1", n)
+		t.Fatalf("password를 검색하고 %d를 누르십시오. 이는 1이어야 합니다.", n)
 	}
 	// Substring inside a token — the default unicode61 tokenizer cannot do this.
 	if n := hits("ssw0r"); n != 1 {
-		t.Fatalf("搜子串 ssw0r 命中 %d 条，应为 1", n)
+		t.Fatalf("검색 하위 문자열 ssw0r는 1이어야 하는 %d를 검색합니다.", n)
 	}
-	if n := hits("内网测试"); n != 1 {
-		t.Fatalf("搜中文命中 %d 条，应为 1", n)
+	if n := hits("인트라넷 테스트"); n != 1 {
+		t.Fatalf("한국어 조회수 %d 검색, 1이어야 함", n)
 	}
 	if n := hits("nonexistent-marker"); n != 0 {
-		t.Fatalf("无关关键词命中 %d 条，应为 0", n)
+		t.Fatalf("관련 없는 키워드 조회 %d는 0이어야 합니다.", n)
 	}
 
 	// Too-short terms are reported, not silently treated as "no match".
 	if _, err := tr.query(host, "", "ab", 0, 10); err == nil {
-		t.Fatal("两字符正文关键词应返回明确错误")
+		t.Fatal("두 문자로 된 본문 키워드는 명시적인 오류를 반환해야 합니다.")
 	}
 }
 
@@ -156,14 +156,14 @@ func TestFullTextSearchMatchesBodies(t *testing.T) {
 func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 	tr, dir := openTraffic(t)
 	if !tr.fts {
-		t.Skip("驱动未启用 FTS5")
+		t.Skip("드라이버가 활성화되지 않음 FTS5")
 	}
 	const host = "dump.example.com"
 	const marker = "DB_PASSWORD=hunter2"
 	// Marker sits far past blobPreview, so only the full-text index can find it.
 	big := []byte(strings.Repeat("-- MySQL dump\n", maxInlineBody/14+2000) + marker)
 	if len(big) <= maxInlineBody+blobPreview {
-		t.Fatalf("测试数据不够大：%d 字节", len(big))
+		t.Fatalf("테스트 데이터가 충분히 크지 않습니다: %d 바이트", len(big))
 	}
 	tr.record(newFlow(host, "GET", "/backup.sql", nil, big, withRespType("application/sql")))
 
@@ -173,15 +173,15 @@ func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(hash) != 64 {
-		t.Fatalf("resp_blob=%q，应为 64 位 sha256", hash)
+		t.Fatalf("resp_blob=%q, 64비트 sha256여야 합니다.", hash)
 	}
 	blob := filepath.Join(dir, "_blobs", "sha256", hash[:2], hash+".bin")
 	st, err := os.Stat(blob)
 	if err != nil {
-		t.Fatalf("blob 未落盘到单层桶 %s：%v", blob, err)
+		t.Fatalf("blob가 단일 레이어 버킷 %s: %v에 배치되지 않았습니다.", blob, err)
 	}
 	if st.Size() != int64(len(big)) {
-		t.Fatalf("blob 大小 %d，应为 %d", st.Size(), len(big))
+		t.Fatalf("blob 크기 %d는 %d여야 합니다.", st.Size(), len(big))
 	}
 
 	// The reference is registered, which is what GC consults.
@@ -190,7 +190,7 @@ func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if refs != 1 {
-		t.Fatalf("blob_refs 行数 %d，应为 1", refs)
+		t.Fatalf("blob_refs 행 번호 %d는 1이어야 합니다.", refs)
 	}
 
 	// Inline: a readable preview plus the pointer, not the whole body.
@@ -199,16 +199,16 @@ func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(resp, "-- MySQL dump") {
-		t.Fatalf("响应缺少头部预览：\n%s", clip(resp, 300))
+		t.Fatalf("응답에 헤더 미리보기가 없습니다: \n%s", clip(resp, 300))
 	}
 	if !strings.Contains(resp, "@blob sha256:"+hash) {
-		t.Fatalf("响应缺少 blob 指针：\n%s", clip(resp, 300))
+		t.Fatalf("blob 포인터가 누락된 응답: \n%s", clip(resp, 300))
 	}
 	if strings.Contains(resp, marker) {
-		t.Fatal("预览不应包含超出 blobPreview 的内容")
+		t.Fatal("미리보기에는 blobPreview 이상의 콘텐츠가 포함되어서는 안 됩니다.")
 	}
 	if len(resp) > blobPreview*2 {
-		t.Fatalf("内联内容 %d 字节，远超预览上限", len(resp))
+		t.Fatalf("인라인 콘텐츠 %d 바이트, 미리보기 제한을 훨씬 초과함", len(resp))
 	}
 
 	// Searchable despite living on disk — the index was fed from memory.
@@ -217,7 +217,7 @@ func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(rows) != 1 {
-		t.Fatalf("超大正文中的关键词命中 %d 条，应为 1", len(rows))
+		t.Fatalf("큰 텍스트의 키워드는 %d를 입력하며 이는 1이어야 합니다.", len(rows))
 	}
 
 	// And retrievable in pages.
@@ -226,13 +226,13 @@ func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if total != int64(len(big)) {
-		t.Fatalf("BlobRange total=%d，应为 %d", total, len(big))
+		t.Fatalf("BlobRange total=%d, %d여야 합니다.", total, len(big))
 	}
 	if string(data) != marker {
-		t.Fatalf("BlobRange 读到 %q，应为 %q", data, marker)
+		t.Fatalf("BlobRange는 %q를 읽습니다. %q여야 합니다.", data, marker)
 	}
 	if _, _, err := tr.BlobRange("../../etc/passwd", 0, 10); err == nil {
-		t.Fatal("非法 hash 应被拒绝")
+		t.Fatal("불법적인 hash는 거부되어야 합니다.")
 	}
 }
 
@@ -241,7 +241,7 @@ func TestLargeBodySpillsButStaysSearchable(t *testing.T) {
 func TestBinaryBodyStaysOutOfIndex(t *testing.T) {
 	tr, _ := openTraffic(t)
 	if !tr.fts {
-		t.Skip("驱动未启用 FTS5")
+		t.Skip("드라이버가 활성화되지 않음 FTS5")
 	}
 	const host = "cdn.example.com"
 	const marker = "SECRETINIMAGE"
@@ -254,14 +254,14 @@ func TestBinaryBodyStaysOutOfIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(rows) != 0 {
-		t.Fatalf("二进制正文不应进入全文索引，却命中 %d 条", len(rows))
+		t.Fatalf("바이너리 텍스트는 전체 텍스트 인덱스에 입력하면 안 되지만 %d에 도달합니다.", len(rows))
 	}
 	_, resp, err := tr.Get(onlyExchangeID(t, tr))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(resp, "[binary image/png") || !strings.Contains(resp, "magic=89504e47") {
-		t.Fatalf("二进制正文应展示类型与魔数，实际：\n%s", clip(resp, 300))
+		t.Fatalf("바이너리 텍스트에는 실제 유형과 매직 넘버(\n%s)가 표시되어야 합니다.", clip(resp, 300))
 	}
 }
 
@@ -289,13 +289,13 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?)`, id, 1, host, "GET", "/", "http://"+host+"/", 200
 
 	req, resp, err := tr.Get(id)
 	if err != nil {
-		t.Fatalf("历史记录应仍可读取：%v", err)
+		t.Fatalf("기록은 여전히 ​​읽을 수 있어야 합니다: %v", err)
 	}
 	if !strings.Contains(req, "Host: old.example.com") {
-		t.Fatalf("历史请求原文错误：%q", req)
+		t.Fatalf("기록 요청의 원본 텍스트 오류: %q", req)
 	}
 	if !strings.Contains(resp, "legacy body") {
-		t.Fatalf("历史响应原文错误：%q", resp)
+		t.Fatalf("기록 응답 원본 텍스트 오류: %q", resp)
 	}
 }
 
@@ -318,13 +318,13 @@ func TestGCCollectsBlobsAndEmptyBuckets(t *testing.T) {
 	}
 
 	if n, err := tr.DeleteHostsExact([]string{host}); err != nil || n != 1 {
-		t.Fatalf("DeleteHostsExact=(%d,%v)，应为 (1,nil)", n, err)
+		t.Fatalf("DeleteHostsExact=(%d,%v)는 (1,nil)이어야 합니다.", n, err)
 	}
 	if _, err := os.Stat(filepath.Join(bucket, hash+".bin")); !os.IsNotExist(err) {
-		t.Fatalf("失去引用的 blob 未被回收：%v", err)
+		t.Fatalf("참조된 blob는 재활용되지 않았습니다: %v", err)
 	}
 	if _, err := os.Stat(bucket); !os.IsNotExist(err) {
-		t.Fatalf("空桶目录未被清理：%v", err)
+		t.Fatalf("빈 버킷 디렉토리가 지워지지 않았습니다: %v", err)
 	}
 	// Bodies and full-text rows go with the exchange.
 	for _, q := range []string{
@@ -336,7 +336,7 @@ func TestGCCollectsBlobsAndEmptyBuckets(t *testing.T) {
 			t.Fatal(err)
 		}
 		if c != 0 {
-			t.Fatalf("%s = %d，应为 0", q, c)
+			t.Fatalf("%s = %d, 0이어야 합니다.", q, c)
 		}
 	}
 	if tr.fts {
@@ -345,7 +345,7 @@ func TestGCCollectsBlobsAndEmptyBuckets(t *testing.T) {
 			t.Fatal(err)
 		}
 		if c != 0 {
-			t.Fatalf("全文索引残留 %d 条", c)
+			t.Fatalf("전체 텍스트 인덱스 남은 %d 항목", c)
 		}
 	}
 }
@@ -355,7 +355,7 @@ func TestGCCollectsBlobsAndEmptyBuckets(t *testing.T) {
 func TestPageSearchesBodies(t *testing.T) {
 	tr, _ := openTraffic(t)
 	if !tr.fts {
-		t.Skip("驱动未启用 FTS5")
+		t.Skip("드라이버가 활성화되지 않음 FTS5")
 	}
 	tr.record(newFlow("api.example.com", "POST", "/v1/login", nil, []byte(`{"error":"invalid credentials"}`)))
 	tr.record(newFlow("api.example.com", "GET", "/v1/health", nil, []byte(`{"status":"ok"}`)))
@@ -365,11 +365,11 @@ func TestPageSearchesBodies(t *testing.T) {
 		t.Fatal(err)
 	}
 	if total != 1 || len(rows) != 1 {
-		t.Fatalf("正文关键词命中 total=%d rows=%d，应为 1/1", total, len(rows))
+		t.Fatalf("텍스트 키워드는 total=%d rows=%d를 적중하며 이는 1/1이어야 합니다.", total, len(rows))
 	}
 	// Metadata matching still works alongside it.
 	if _, total, err := tr.Page(PageQuery{Query: "health", RespMin: -1, RespMax: -1}, 0, 100); err != nil || total != 1 {
-		t.Fatalf("URL 关键词 total=%d err=%v，应为 1", total, err)
+		t.Fatalf("URL 키워드 total=%d err=%v, 1이어야 합니다.", total, err)
 	}
 }
 
@@ -386,31 +386,31 @@ func TestPageFiltersAndSort(t *testing.T) {
 
 	// Status class band.
 	if rows, _, err := tr.Page(PageQuery{Status: "4xx", RespMin: -1, RespMax: -1}, 0, 100); err != nil || len(rows) != 1 || rows[0].Status != 404 {
-		t.Fatalf("status=4xx 应命中 1 条 404，得 %d 条 err=%v", len(rows), err)
+		t.Fatalf("status=4xx는 1 404에 도달해야 하며 %d err=%v를 얻습니다.", len(rows), err)
 	}
 	// Exact status.
 	if rows, _, err := tr.Page(PageQuery{Status: "500", RespMin: -1, RespMax: -1}, 0, 100); err != nil || len(rows) != 1 || rows[0].Status != 500 {
-		t.Fatalf("status=500 应命中 1 条，得 %d 条 err=%v", len(rows), err)
+		t.Fatalf("status=500은 1개를 맞춰야 하며, %d 조각을 얻습니다. err=%v", len(rows), err)
 	}
 	// Response-size lower bound (>=60 keeps only the 100-byte row).
 	if rows, _, err := tr.Page(PageQuery{RespMin: 60, RespMax: -1}, 0, 100); err != nil || len(rows) != 1 || rows[0].RespLen != 100 {
-		t.Fatalf("resp_min=60 应命中 1 条 100B，得 %d 条 err=%v", len(rows), err)
+		t.Fatalf("resp_min=60은 1 100B에 도달해야 하며, %d err=%v를 얻습니다.", len(rows), err)
 	}
 	// Path (url_template) filter narrows to the /api/admin exchange.
 	if rows, _, err := tr.Page(PageQuery{Path: "/api/admin", RespMin: -1, RespMax: -1}, 0, 100); err != nil || len(rows) != 1 || rows[0].Status != 404 {
-		t.Fatalf("path=/api/admin 应命中 1 条，得 %d 条 err=%v", len(rows), err)
+		t.Fatalf("path=/api/admin는 1이 되어야 하며, %d err=%v를 얻습니다.", len(rows), err)
 	}
 	// Sort by response length, ascending then descending.
 	asc, _, err := tr.Page(PageQuery{RespMin: -1, RespMax: -1, Sort: "resp_len", Order: "asc"}, 0, 100)
 	if err != nil || len(asc) != 3 {
-		t.Fatalf("resp_len asc 应返回 3 条，得 %d 条 err=%v", len(asc), err)
+		t.Fatalf("resp_len asc는 3개 항목을 반환해야 하며, %d 항목을 가져와야 합니다. err=%v", len(asc), err)
 	}
 	if asc[0].RespLen != 10 || asc[1].RespLen != 50 || asc[2].RespLen != 100 {
-		t.Fatalf("resp_len asc 顺序错误：%d,%d,%d", asc[0].RespLen, asc[1].RespLen, asc[2].RespLen)
+		t.Fatalf("resp_len asc 잘못된 순서: %d, %d, %d", asc[0].RespLen, asc[1].RespLen, asc[2].RespLen)
 	}
 	desc, _, err := tr.Page(PageQuery{RespMin: -1, RespMax: -1, Sort: "resp_len", Order: "desc"}, 0, 100)
 	if err != nil || len(desc) != 3 || desc[0].RespLen != 100 || desc[2].RespLen != 10 {
-		t.Fatalf("resp_len desc 顺序错误 err=%v", err)
+		t.Fatalf("resp_len desc 순서가 잘못되었습니다. err=%v", err)
 	}
 }
 
@@ -463,18 +463,18 @@ func TestNormalizeSearchHost(t *testing.T) {
 
 // TestTruncateUTF8 guards the preview cut: never split a multi-byte rune.
 func TestTruncateUTF8(t *testing.T) {
-	s := "内网测试账号"
+	s := "인트라넷 테스트 계정"
 	for n := 0; n <= len(s); n++ {
 		got := truncateUTF8([]byte(s), n)
 		if !strings.HasPrefix(s, got) {
-			t.Fatalf("n=%d 截断结果 %q 不是原串前缀", n, got)
+			t.Fatalf("n=%d 잘림 결과 %q는 원래 문자열 접두사가 아닙니다.", n, got)
 		}
 		if len(got) > n {
-			t.Fatalf("n=%d 截断后 %d 字节，超出上限", n, len(got))
+			t.Fatalf("잘린 후 n=%d %d 바이트, 상한 초과", n, len(got))
 		}
 	}
 	if got := truncateUTF8([]byte("abc"), 10); got != "abc" {
-		t.Fatalf("短于上限时应原样返回，得到 %q", got)
+		t.Fatalf("상한값보다 짧다면 그대로 반환하고 %q를 얻어야 한다.", got)
 	}
 }
 
@@ -497,7 +497,7 @@ func TestIsBinaryBody(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := isBinaryBody(c.ct, []byte(c.body)); got != c.want {
-			t.Errorf("isBinaryBody(%q, %q)=%v，应为 %v", c.ct, c.body, got, c.want)
+			t.Errorf("isBinaryBody(%q, %q)=%v, %v여야 합니다.", c.ct, c.body, got, c.want)
 		}
 	}
 }
@@ -523,6 +523,6 @@ func TestRecordConcurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if exchanges != n || bodies != n {
-		t.Fatalf("并发写入后 exchanges=%d bodies=%d，应各为 %d", exchanges, bodies, n)
+		t.Fatalf("동시 쓰기 후 exchanges=%d bodies=%d, 각각 %d이어야 합니다.", exchanges, bodies, n)
 	}
 }

@@ -5,16 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// 抽屉/对话框(Sheet/Dialog)的 onInteractOutside 关闭判定辅助。
+// 서랍/대화 상자(Sheet/Dialog)의 onInteractOutside는 판단 지원을 끕니다.
 //
-// 背景:抽屉内的 Radix 弹层(Select 下拉、DropdownMenu、Popover 等)会 portal 到抽屉
-// 之外。开着弹层时点遮罩/抽屉外想收起它,这一次 pointerdown 会被 Select 和 Sheet 两个
-// DismissableLayer 同时处理;Select 先关闭且是 discrete 事件、React 会同步 flush,于是
-// 轮到 Sheet 的处理器时弹层的 data-state 早已翻成 closed —— 在"当下"检测弹层是否打开
-// 天然不可靠(实测已验证)。
+// 배경: 서랍에 있는 Radix 탄성층(Select 드롭다운, DropdownMenu, Popover 등)이 서랍에 portal를 넣습니다.
+// 밖의. 탄성 레이어를 열고 마스크/서랍 외부를 클릭하여 닫으면 이번에는 pointerdown가 두 개의 Select 및 Sheet로 대체됩니다.
+// DismissableLayer는 동시에 처리됩니다. Select가 먼저 닫히고 discrete 이벤트이므로 React는 flush와 동기화되므로
+// Sheet 차례의 프로세서인 경우 탄성 레이어 data-state는 이미 closed로 변환되어 탄성 레이어가 "현재" 열려 있는지 여부를 감지합니다.
+// 당연히 신뢰할 수 없습니다(실제 측정으로 입증됨).
 //
-// 正确做法:Radix 的 pointerdown 监听在冒泡阶段;我们在 capture 阶段(早于它)先把
-// "此刻有没有弹层开着"记录下来,onInteractOutside 再读这个记录值来决定是否放行关闭。
+// 올바른 접근 방식: Radix의 pointerdown 모니터링은 버블링 단계에 있습니다. 먼저 capture 단계(이전)에 넣습니다.
+// "지금 이 순간 열려 있는 탄성 레이어가 있습니까?"라고 기록하고, onInteractOutside는 이 기록 값을 다시 읽어 클로저를 해제할지 여부를 결정합니다.
 function isRadixOverlayOpenNow(): boolean {
   if (typeof document === "undefined") return false;
   return !!document.querySelector(
@@ -35,26 +35,26 @@ if (typeof document !== "undefined") {
     () => {
       overlayOpenAtLastPointerDown = isRadixOverlayOpenNow();
     },
-    true, // capture:抢在 Radix 冒泡阶段的 pointerdown 处理器之前记录
+    true, // capture:는 Radix의 버블링 단계에서 pointerdown 프로세서 이전에 기록합니다.
   );
 }
 
-// radixOverlayWasOpenAtPointerDown 返回"最近一次 pointerdown 发生时是否有 Radix 弹层
-// 开着"。抽屉/对话框据此:开着弹层时点遮罩 → 只收弹层、不关自身。
+// radixOverlayWasOpenAtPointerDown는 "최신 pointerdown가 발생했을 때 Radix 탄성 레이어가 있었는지 여부"를 반환합니다.
+// 열기". 서랍/대화 상자는 다음을 기반으로 합니다. 탄성 레이어가 열려 있으면 마스크를 클릭하고 → 탄성 레이어만 닫고 자체는 닫지 않습니다.
 export function radixOverlayWasOpenAtPointerDown(): boolean {
   return overlayOpenAtLastPointerDown;
 }
 
-// copyText 把文本写入剪贴板,返回是否成功。
-// 背景:navigator.clipboard 仅在安全上下文(HTTPS / localhost)可用;通过 IP + HTTP
-// 访问时它为 undefined,此时降级到 execCommand("copy")。
+// copyText 클립보드에 텍스트를 쓰고 성공 여부를 반환합니다.
+// 배경: navigator.clipboard는 보안 컨텍스트(HTTPS / localhost)에서만 사용할 수 있습니다. IP + HTTP를 통해
+// 접속시에는 undefined이며, 이때 execCommand("copy")로 다운그레이드됩니다.
 export async function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      // 继续走降级方案
+      // 다운그레이드 계획 계속하기
     }
   }
   try {
@@ -98,7 +98,7 @@ export function formatCurrency(
     noDecimals?: boolean;
   },
 ) {
-  const { currency = "USD", locale = "en-US", minimumFractionDigits, maximumFractionDigits, noDecimals } = opts ?? {};
+  const { currency = "USD", locale = "ko-KR", minimumFractionDigits, maximumFractionDigits, noDecimals } = opts ?? {};
 
   const formatOptions: Intl.NumberFormatOptions = {
     style: "currency",

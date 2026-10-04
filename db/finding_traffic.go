@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	ErrEvidenceConflict = errors.New("流量证据已变更，请刷新后重试")
-	ErrFindingNotFound  = errors.New("漏洞不存在")
-	ErrEvidenceNotFound = errors.New("流量证据不存在")
+	ErrEvidenceConflict = errors.New("교통 증거가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.")
+	ErrFindingNotFound  = errors.New("취약점이 존재하지 않습니다.")
+	ErrEvidenceNotFound = errors.New("교통 증거가 존재하지 않습니다")
 )
 
 // This lock covers the evidence filesystem as well as its SQL references. All
@@ -51,13 +51,13 @@ func NormalizeTrafficRefs(refs []TrafficRef) ([]TrafficRef, error) {
 	for _, ref := range refs {
 		ref.TrafficID = strings.TrimSpace(ref.TrafficID)
 		if ref.TrafficID == "" {
-			return nil, errors.New("traffic_id 不能为空")
+			return nil, errors.New("traffic_id는 비워둘 수 없습니다.")
 		}
 		if ref.Role == "" {
 			ref.Role = "supporting"
 		}
 		if !ValidTrafficRole(ref.Role) {
-			return nil, fmt.Errorf("无效的流量用途 %q", ref.Role)
+			return nil, fmt.Errorf("잘못된 트래픽 사용량 %q", ref.Role)
 		}
 		if !seen[ref.TrafficID] {
 			out = append(out, ref)
@@ -186,7 +186,7 @@ func LockFindingEvidenceTx(tx *sql.Tx, findingID int64, version *int64) error {
 
 func InsertEvidenceSnapshotTx(tx *sql.Tx, s TrafficEvidenceSnapshot) error {
 	if s.ID != TrafficSnapshotID(s) {
-		return errors.New("证据快照元数据哈希不匹配")
+		return errors.New("증거 스냅샷 메타데이터 해시 불일치")
 	}
 	// The ID was computed over the normalized form; store those same bytes.
 	id := s.ID
@@ -275,7 +275,7 @@ func (d *DB) GetFindingTraffic(ctx context.Context, findingID int64) (out *Findi
 
 func (d *DB) EditFindingTraffic(ctx context.Context, findingID, bindingID, version int64, role, note *string, remove bool, order []int64) error {
 	if role != nil && !ValidTrafficRole(*role) {
-		return errors.New("无效的流量用途")
+		return errors.New("잘못된 트래픽 사용량")
 	}
 	return d.WithEvidenceTx(ctx, func(tx *sql.Tx) error {
 		if err := LockFindingEvidenceTx(tx, findingID, &version); err != nil {
@@ -337,8 +337,8 @@ type RecordedFinding struct {
 	Traffic   *FindingTraffic `json:"traffic"`
 }
 
-// ctx 由调用方传入本次事务所用的上下文（而非在内部取 context.Background）：
-// 事务内新加的推送事件写入同样应受调用方的取消与超时约束。
+// ctx 이 트랜잭션에 사용된 컨텍스트는 내부적으로 context.Background를 가져오는 대신 호출자에 의해 전달됩니다.
+// 트랜잭션 내에서 새 푸시 이벤트를 작성하는 경우에도 호출자의 취소 및 시간 초과 제한이 적용되어야 합니다.
 func RecordFindingTx(ctx context.Context, tx *sql.Tx, in RecordFindingInput, prepared []PreparedTrafficEvidence) (*RecordedFinding, error) {
 	if err := LockTaskEvidenceTx(tx, in.TaskID); err != nil {
 		return nil, err
@@ -349,7 +349,7 @@ func RecordFindingTx(ctx context.Context, tx *sql.Tx, in RecordFindingInput, pre
 			return nil, err
 		}
 		if expID != in.ExplorationID {
-			return nil, errors.New("漏洞所属任务与探索记录不匹配")
+			return nil, errors.New("취약점이 속한 작업이 탐색 기록과 일치하지 않습니다.")
 		}
 	}
 	if in.IntentID > 0 {
@@ -358,7 +358,7 @@ func RecordFindingTx(ctx context.Context, tx *sql.Tx, in RecordFindingInput, pre
 			return nil, err
 		}
 		if !ok {
-			return nil, errors.New("intent_id 必须是本任务的意图（关联任务意图只读）")
+			return nil, errors.New("intent_id는 이 작업의 의도여야 합니다(관련 작업 의도는 읽기 전용입니다).")
 		}
 	}
 	payload, _ := json.Marshal(map[string]any{"vulnclass": in.VulnClass, "name": in.Name, "severity": in.Severity, "summary": in.Summary, "evidence": map[string]any{"by": in.Worker, "poc": in.Evidence}})
@@ -386,9 +386,9 @@ VALUES($1,'finding',$2,9,'confirmed',$3) RETURNING id`, in.ExplorationID, string
 VALUES(NULLIF($1,0),$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, in.TaskID, out.NodeID, in.VulnClass, in.Name, in.Severity, in.Summary, in.Evidence, in.Worker, string(raw)).Scan(&out.FindingID); err != nil {
 		return nil, err
 	}
-	// 在**同一事务**里登记一条推送事件：提交即保证「漏洞落库」与「推送任务存在」
-	// 原子一致，不存在提交成功却没入队、消息永久丢失的窗口。
-	// 这里的失败被隔离在保存点上、不影响漏洞写入（见函数注释），因此忽略返回值。
+	// **동일한 트랜잭션**에 푸시 이벤트 등록: 제출하면 "취약점이 기록되고" "푸시 작업이 존재"하는지 확인됩니다.
+	// 원자적 일관성은 제출이 성공했지만 대기열에 추가되지 않고 메시지가 영구적으로 손실되는 창이 없습니다.
+	// 여기서 실패는 저장점으로 격리되며 취약점 쓰기에 영향을 주지 않으므로(함수 설명 참조) 반환 값은 무시됩니다.
 	RecordNotificationEventTx(ctx, tx, notify.EventFindingCreated, out.FindingID, notify.Snapshot{
 		Kind:      notify.EventFindingCreated,
 		FindingID: out.FindingID,

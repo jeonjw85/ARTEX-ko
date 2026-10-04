@@ -34,7 +34,7 @@ func (s *Server) webuiHandler() http.Handler {
 		// 1) exact file (assets: _next/*, favicon.ico, ...)
 		// 2) route dir → <p>/index.html (trailingSlash export)
 		// 3) <p>.html
-		// 4) SPA 兜底 → index.html（交给客户端路由）
+		// 4) SPA는 모든 것을 알고 있음 → index.html (라우팅은 클라이언트에 맡기세요)
 		for _, cand := range []string{p, p + "/index.html", p + ".html"} {
 			if serveFileIfExists(w, r, root, cand) {
 				return

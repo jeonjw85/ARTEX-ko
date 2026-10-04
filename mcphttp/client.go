@@ -315,9 +315,9 @@ func (c *Client) wrap(rt remoteTool) actool.CoreTool {
 			for _, blk := range res.Content {
 				text += blk.Text
 			}
-			// 与内置/自定义工具一致：超长输出走 Capture——按会话 MaxOutputChars（默认
-			// 30000）截断，配了 ToolOutputDir 时全量溢写到磁盘只留 head + 指针，避免大
-			// MCP 结果整段灌爆上下文。
+			// 내장/사용자 정의 도구와 일치: 매우 긴 출력이 Capture로 이동 - 세션별 MaxOutputChars(기본값)
+			// 30000) 잘림, ToolOutputDir가 구성되면 전체 볼륨이 오버플로되어 디스크에 기록되며 큰 문제를 방지하기 위해 head + 포인터만 남습니다.
+			// MCP는 전체 폭발 상황을 초래합니다.
 			return actool.Result{Content: []llm.ContentBlock{llm.TextBlock(actool.Capture(tc, text))}, IsError: res.IsError}, nil
 		},
 	})

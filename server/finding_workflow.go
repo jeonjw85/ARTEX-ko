@@ -54,7 +54,7 @@ func (s *Server) seedFindingWorkflowTools() {
 		props := objectProperty(schema, "properties")
 		if key == "report_finding" {
 			if _, exists := props["evidence_hint_id"]; !exists {
-				props["evidence_hint_id"] = map[string]any{"type": "integer", "description": "可选：本任务中对应此漏洞的 hint ID；读取该提示保存的 traffic_refs 一并绑定，无提示时省略"}
+				props["evidence_hint_id"] = map[string]any{"type": "integer", "description": "선택 사항: 이 작업의 이 취약점에 해당하는 hint ID; 이 프롬프트로 저장된 traffic_refs를 읽고 함께 묶고, 프롬프트가 없으면 생략합니다."}
 			}
 		} else {
 			if _, exists := props["traffic_refs"]; !exists {
@@ -69,7 +69,7 @@ func (s *Server) seedFindingWorkflowTools() {
 				items["type"] = "object"
 			}
 			itemProps := objectProperty(items, "properties")
-			for name, value := range map[string]any{"text": strParam("提示内容"), "asset_ids": map[string]any{"type": "array", "items": map[string]any{"type": "integer"}}, "traffic_refs": agent.HintTrafficSchema()} {
+			for name, value := range map[string]any{"text": strParam("프롬프트 내용"), "asset_ids": map[string]any{"type": "array", "items": map[string]any{"type": "integer"}}, "traffic_refs": agent.HintTrafficSchema()} {
 				if _, exists := itemProps[name]; !exists {
 					itemProps[name] = value
 				}
@@ -117,37 +117,37 @@ func objectProperty(parent map[string]any, key string) map[string]any {
 
 func (s *Server) agentFindingTrafficAccess(ctx context.Context, id int64, write bool) error {
 	if id <= 0 {
-		return errors.New("finding_id 必须为独立漏洞记录 ID；不是探索节点 ID")
+		return errors.New("finding_id는 독립적인 취약성 레코드 ID여야 합니다. 탐사 노드 ID가 아닙니다.")
 	}
 	f, err := s.m.pg.GetFinding(id)
 	if err != nil {
 		return err
 	}
 	if f == nil {
-		return fmt.Errorf("%w：finding_id=%d。证据工具使用独立漏洞记录 ID，请从 list_task_findings / get_task_node_detail 的 finding_id 字段读取；不要传 id / finding_node_id", db.ErrFindingNotFound, id)
+		return fmt.Errorf("%w: finding_id=%d. 증거 도구는 독립적인 취약점 기록 ID를 사용합니다. list_task_findings / get_task_node_detail의 finding_id 필드를 읽어보세요. id / finding_node_id를 통과하지 마십시오", db.ErrFindingNotFound, id)
 	}
 	if ri := agent.RunInfoFrom(ctx); ri.TaskID > 0 {
 		task := s.m.ResolveTask(strconv.FormatInt(ri.TaskID, 10))
 		if task == nil {
-			return errors.New("任务不存在")
+			return errors.New("작업이 존재하지 않습니다.")
 		}
 		_, inherited, allowed := findingProvenanceInTask(task, f.TaskID)
 		if !allowed {
-			return errors.New("当前任务不可读取该漏洞")
+			return errors.New("현재 작업에서는 취약점을 읽을 수 없습니다.")
 		}
 		if write && inherited {
-			return errors.New("继承漏洞的流量证据只读，请到来源任务修改")
+			return errors.New("상속된 취약점의 트래픽 증거는 읽기 전용입니다. 수정하려면 소스 작업으로 이동하세요.")
 		}
 	}
 	return nil
 }
 
 func (s *Server) toolBindFindingTraffic() actool.CoreTool {
-	return wrTool("bind_finding_traffic", "为已登记漏洞补绑经核实的真实 HTTP 流量。finding_id 使用独立漏洞记录 ID；不要传探索节点 ID。同批引用全部成功或全部失败，重复引用不覆盖已有说明。补绑会使已有报告标记待更新；不要为补包重新探测或重复创建漏洞。",
-		objSchema(map[string]any{"finding_id": strParam("独立漏洞记录 ID，从 list_task_findings / get_task_node_detail 的 finding_id 字段读取"), "traffic_refs": agent.HintTrafficSchema()}, "finding_id", "traffic_refs"),
+	return wrTool("bind_finding_traffic", "등록된 취약점에 대해 검증된 실제 HTTP 트래픽을 패치합니다. finding_id 독립적인 취약성 레코드 ID를 사용합니다. 탐사 노드 ID를 통과하지 마십시오. 동일한 배치의 모든 참조가 성공하거나 모두 실패합니다. 반복된 참조에는 기존 지침이 포함되지 않습니다. 패치를 적용하면 기존 보고서에 업데이트가 표시됩니다. 패치를 위해 취약점을 다시 검색하거나 재생성하지 마십시오.",
+		objSchema(map[string]any{"finding_id": strParam("독립적인 취약점 레코드 ID, list_task_findings / get_task_node_detail의 finding_id 필드에서 읽음"), "traffic_refs": agent.HintTrafficSchema()}, "finding_id", "traffic_refs"),
 		func(ctx context.Context, raw json.RawMessage) (actool.Result, error) {
 			if !s.m.pg.GetBool(settingAgentTrafficBinding, false) {
-				return actool.Errorf("Agent 自动绑定流量已关闭；请在系统设置开启，或使用页面人工绑定。"), nil
+				return actool.Errorf("Agent 트래픽 자동 바인딩이 꺼졌습니다. 시스템 설정에서 활성화하거나 페이지를 사용하여 수동으로 바인딩하세요."), nil
 			}
 			var args struct {
 				FindingID json.RawMessage `json:"finding_id"`
@@ -161,7 +161,7 @@ func (s *Server) toolBindFindingTraffic() actool.CoreTool {
 				return actool.Errorf(err.Error()), nil
 			}
 			if len(args.Refs) == 0 {
-				return actool.Errorf("补绑需要至少一条已核实的 traffic_refs；无流量无需调用此工具"), nil
+				return actool.Errorf("리바인딩에는 검증된 traffic_refs가 하나 이상 필요합니다. 트래픽이 없으면 이 도구를 호출할 필요가 없습니다."), nil
 			}
 			list, err := s.evidenceStore().Bind(ctx, id, args.Refs)
 			if err != nil {

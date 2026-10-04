@@ -16,7 +16,7 @@ import { SearchDialog } from "./sidebar/search-dialog";
 import { ThemeSwitcher } from "./sidebar/theme-switcher";
 import { UpdateBadge } from "./update-badge";
 
-// 任务详情页保持原样：它自带头部/Tabs 与内边距，这里不再叠加全局头部和 padding。
+// 작업 세부정보 페이지는 동일하게 유지됩니다. 자체 헤더/Tabs 및 패딩이 함께 제공되며 전역 헤더와 padding는 더 이상 여기에 겹쳐지지 않습니다.
 function isFullBleed(pathname: string) {
   const p = (() => {
     try {
@@ -25,8 +25,8 @@ function isFullBleed(pathname: string) {
       return pathname;
     }
   })();
-  // 静态导出开了 trailingSlash，列表页自身的 pathname 是 "/function/tasks/"，
-  // 先去掉尾斜杠再判前缀，否则列表页会被误判成详情页而丢掉全局头部。
+  // trailingSlash는 정적으로 내보내지며 목록 페이지 자체의 pathname는 "/function/tasks/"입니다.
+  // 후행 슬래시를 먼저 제거한 다음 접두사를 판단하십시오. 그렇지 않으면 목록 페이지가 세부 정보 페이지로 잘못 판단되어 전역 헤더가 손실됩니다.
   const normalized = p.replace(/\/+$/, "");
   return normalized.startsWith("/function/tasks/");
 }
@@ -66,7 +66,7 @@ export function MainContent({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             {version && (
-              <span className="font-medium text-muted-foreground text-xs tabular-nums">版本 · {version}</span>
+              <span className="font-medium text-muted-foreground text-xs tabular-nums">버전 · {version}</span>
             )}
             <UpdateBadge />
             <LayoutControls />

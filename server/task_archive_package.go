@@ -503,7 +503,7 @@ func stageTaskArchivePackageDelete(archivePath string, archiveID int64) (string,
 	staged := archivePath + fmt.Sprintf(".deleting-%d", archiveID)
 	if _, err := os.Lstat(staged); err == nil {
 		if _, originalErr := os.Lstat(archivePath); originalErr == nil {
-			return staged, false, errors.New("归档包原文件和删除暂存文件同时存在")
+			return staged, false, errors.New("보관패키지의 원본파일과 삭제된 임시파일이 동시에 존재함")
 		} else if !os.IsNotExist(originalErr) {
 			return staged, false, originalErr
 		}
@@ -578,10 +578,10 @@ func writeTaskArchivePackage(path, payloadDir string, snapshot *pgdb.TaskArchive
 			return err
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			// 归档格式端到端只支持普通文件与目录（解包端对其它类型直接报错），
-			// 无法还原符号链接。跳过而非整包失败：不读取链接目标(lstat，不越出目录树)，
-			// 也不写入 symlink 条目；链接指向树内时目标文件本身仍会被单独遍历归档。
-			log.Printf("[task-archive] 跳过符号链接（归档不支持，不影响其它文件）：%s", current)
+			// 아카이브 형식은 일반 파일과 디렉터리만 엔드투엔드(end-to-end) 지원합니다(압축해제 쪽은 다른 유형에 대한 오류를 직접 보고합니다).
+			// 심볼릭 링크를 복원할 수 없습니다. 전체 패키지 대신 건너뛰기가 실패했습니다. 링크 대상을 읽지 못함(lstat, 디렉터리 트리를 교차하지 않음),
+			// symlink 항목도 기록되지 않습니다. 링크가 트리 내의 지점을 가리킬 때 대상 파일 자체는 여전히 개별적으로 탐색됩니다.
+			log.Printf("[task-archive] 심볼릭 링크 건너뛰기(아카이브에서는 지원되지 않으며 다른 파일에는 영향을 주지 않음)）：%s", current)
 			return nil
 		}
 		header, err := tar.FileInfoHeader(info, "")

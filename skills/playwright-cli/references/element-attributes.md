@@ -1,8 +1,8 @@
-# Inspecting Element Attributes
+# 요소 속성 검사
 
-When the snapshot doesn't show an element's `id`, `class`, `data-*` attributes, or other DOM properties, use `eval` to inspect them.
+스냅샷에 요소의 `id`, `class`, `data-*` 속성 또는 기타 DOM 속성이 표시되지 않으면 `eval`를 사용하여 검사하세요.
 
-## Examples
+## 예
 
 ```bash
 playwright-cli snapshot

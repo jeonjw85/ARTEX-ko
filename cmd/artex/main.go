@@ -37,8 +37,8 @@ const banner = `
 // printBanner writes the startup banner + version/runtime info to stdout.
 func printBanner(addr string) {
 	fmt.Print(banner)
-	fmt.Println("  AI 自主渗透测试系统")
-	fmt.Printf("  版本 %s  ·  %s/%s  ·  %s  ·  监听 %s\n\n",
+	fmt.Println("  AI 기반 자율 모의 침투 테스트 시스템")
+	fmt.Printf("  버전 %s · %s/%s · %s · 수신 주소 %s\n\n",
 		version, runtime.GOOS, runtime.GOARCH, runtime.Version(), addr)
 }
 
@@ -52,9 +52,9 @@ func main() {
 
 func run() int {
 	var (
-		addr    = flag.String("addr", ":8787", "HTTP listen address")
-		dataDir = flag.String("data", filepath.Join(config.BaseDir(), "data"), "data directory for SQLite stores (default: data/ next to the executable)")
-		proxy   = flag.String("proxy", "127.0.0.1:8788", "traffic recording proxy address (empty to disable)")
+		addr    = flag.String("addr", ":8787", "HTTP 수신 주소")
+		dataDir = flag.String("data", filepath.Join(config.BaseDir(), "data"), "SQLite 저장소의 데이터 디렉터리(기본값: 실행 파일 옆의 data/)")
+		proxy   = flag.String("proxy", "127.0.0.1:8788", "트래픽 기록 프록시 주소(비워 두면 비활성화)")
 	)
 	flag.Parse()
 
@@ -85,9 +85,9 @@ func run() int {
 		cfgPath = abs
 	}
 	if _, e := os.Stat(cfgPath); e == nil {
-		log.Printf("[config] 配置文件: %s", cfgPath)
+		log.Printf("[config] 구성 파일: %s", cfgPath)
 	} else {
-		log.Printf("[config] 配置文件: %s (不存在 — 将仅尝试环境变量 ARTEX_PG_DSN)", cfgPath)
+		log.Printf("[config] 구성 파일: %s (존재하지 않습니다 - 환경 변수만 시도됩니다 ARTEX_PG_DSN)", cfgPath)
 	}
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -97,7 +97,7 @@ func run() int {
 
 	mgr, err := server.NewManager(*dataDir, *proxy)
 	if err != nil {
-		log.Fatalf("open stores: %v", err)
+		log.Fatalf("저장소 열기 실패: %v", err)
 	}
 	defer mgr.Close()
 
@@ -111,7 +111,7 @@ func run() int {
 	if abs, err := filepath.Abs(skillDir); err == nil {
 		skillDir = abs
 	}
-	log.Printf("[config] skill 目录: %s", skillDir)
+	log.Printf("[config] 스킬 디렉터리: %s", skillDir)
 	srv := server.New(ctx, mgr, skillDir, *dataDir, config.BaseDir())
 	httpSrv := &http.Server{
 		Addr:              *addr,
@@ -120,9 +120,9 @@ func run() int {
 	}
 
 	go func() {
-		log.Printf("ARTEX %s backend listening on %s (data=%s, workers=%d)", version, *addr, *dataDir, mgr.Workers())
+		log.Printf("ARTEX %s 백엔드 시작: %s (데이터=%s, 워커=%d)", version, *addr, *dataDir, mgr.Workers())
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("serve: %v", err)
+			log.Fatalf("서버 실행 실패: %v", err)
 		}
 	}()
 
@@ -137,7 +137,7 @@ func run() int {
 		shutdown(agent.AbortShutdown)
 	}
 
-	log.Println("shutting down...")
+	log.Println("종료 중...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpSrv.Shutdown(shutdownCtx)

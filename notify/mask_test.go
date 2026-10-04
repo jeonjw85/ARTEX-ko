@@ -10,29 +10,29 @@ func TestMaskedValueHidesBodyButKeepsTailHint(t *testing.T) {
 	const secret = "https://oapi.dingtalk.com/robot/send?access_token=abcdef123456"
 	got := MaskedValue(secret)
 	if strings.Contains(got, "abcdef123456") {
-		t.Fatalf("掩码值泄露了完整凭据: %q", got)
+		t.Fatalf("마스크 값은 전체 자격 증명을 나타냅니다: %q", got)
 	}
 	if strings.Contains(got, "oapi.dingtalk.com") {
-		t.Fatalf("掩码值不应暴露地址主体: %q", got)
+		t.Fatalf("마스크 값은 주소 본문(%q)을 노출해서는 안 됩니다.", got)
 	}
-	// 末 6 位要保留，用户才能认出是哪个机器人。
+	// 마지막 6자리는 사용자가 어떤 로봇인지 식별할 수 있도록 남겨두어야 합니다.
 	if !strings.HasSuffix(got, "123456") {
-		t.Fatalf("应保留末 6 位作为辨识提示: %q", got)
+		t.Fatalf("마지막 6자리는 식별 팁으로 보관해야 합니다: %q", got)
 	}
 	if !IsMasked(got) {
-		t.Fatalf("掩码值必须能被 IsMasked 识别: %q", got)
+		t.Fatalf("마스크 값은 IsMasked: %q에서 인식되어야 합니다.", got)
 	}
 }
 
 func TestMaskedValueShortSecretGivesNoHint(t *testing.T) {
-	// 短凭据如果也暴露末 6 位，等于把整个凭据暴露出去。
+	// 짧은 크리덴셜의 마지막 6자리까지 노출된다면 크리덴셜 전체를 노출시키는 것과 같습니다.
 	for _, s := range []string{"abc", "abcdef", ""} {
 		got := MaskedValue(s)
 		if got != MaskedPrefix {
-			t.Fatalf("长度 %d 的凭据不应给出尾部提示，得到 %q", len(s), got)
+			t.Fatalf("%d 길이의 자격 증명은 꼬리 힌트를 제공하지 않아야 하며 %q를 가져옵니다.", len(s), got)
 		}
 		if s != "" && strings.Contains(got, s) {
-			t.Fatalf("掩码值包含了原值: %q", got)
+			t.Fatalf("마스크 값에는 원래 값인 %q가 포함됩니다.", got)
 		}
 	}
 }
@@ -48,35 +48,35 @@ func TestMaskConfigMasksOnlySecrets(t *testing.T) {
 	for _, k := range []string{"webhook", "secret"} {
 		s, _ := masked[k].(string)
 		if !IsMasked(s) {
-			t.Errorf("%s 应被掩码，得到 %q", k, s)
+			t.Errorf("%q를 얻으려면 %s를 마스크해야 합니다.", k, s)
 		}
 	}
-	// 非凭据字段必须原样保留，否则 UI 无法展示。
+	// 자격 증명이 아닌 필드는 그대로 두어야 합니다. 그렇지 않으면 UI를 표시할 수 없습니다.
 	if masked["port"] != float64(587) {
-		t.Errorf("非凭据字段 port 不应改动: %v", masked["port"])
+		t.Errorf("비자격 증명 필드 port는 변경하면 안 됩니다: %v", masked["port"])
 	}
 }
 
 func TestMaskConfigUnknownKindReturnsEmpty(t *testing.T) {
-	// 渠道类型无法识别时，宁可让 UI 显示空配置，也不要把可能含凭据的原始内容吐回去。
+	// 채널 유형을 인식할 수 없는 경우 자격 증명이 포함될 수 있는 원본 콘텐츠를 다시 표시하는 것보다 UI가 빈 구성을 표시하도록 하는 것이 더 좋습니다.
 	got := MaskConfig("nope", map[string]any{"webhook": "https://x/y?token=LEAK"})
 	if len(got) != 0 {
-		t.Fatalf("未知渠道类型应返回空配置，得到 %v", got)
+		t.Fatalf("알 수 없는 채널 유형은 빈 구성을 반환해야 합니다. %v를 가져옵니다.", got)
 	}
 }
 
 func TestMaskConfigDoesNotMutateInput(t *testing.T) {
-	// 掩码是展示层行为，不能反过来把库里的真值改掉。
+	// 마스크는 표시 레이어 동작이므로 라이브러리의 실제 값을 변경할 수 없습니다.
 	cfg := map[string]any{"webhook": "https://example.com/hook", "secret": "SECtest123456"}
 	_ = MaskConfig(KindDingTalk, cfg)
 	if IsMasked(cfg["secret"].(string)) {
-		t.Fatal("MaskConfig 修改了入参，会导致真实凭据被掩码值覆盖")
+		t.Fatal("MaskConfig는 입력 매개변수를 수정하여 실제 자격 증명을 마스크 값으로 덮어쓰게 됩니다.")
 	}
 }
 
 func TestMergeConfigKeepsStoredOnMaskedIncoming(t *testing.T) {
 	stored := map[string]any{"webhook": "https://real/hook", "secret": "REALSECRET", "method": "POST"}
-	// 用户只改了 method，浏览器提交的是掩码值+新 method。
+	// 사용자는 method만 변경했고 브라우저는 마스크 값 + 새 method를 제출했습니다.
 	incoming := map[string]any{
 		"webhook": MaskedValue("https://real/hook"),
 		"secret":  MaskedValue("REALSECRET"),
@@ -84,10 +84,10 @@ func TestMergeConfigKeepsStoredOnMaskedIncoming(t *testing.T) {
 	}
 	got := MergeConfig(stored, incoming)
 	if got["webhook"] != "https://real/hook" || got["secret"] != "REALSECRET" {
-		t.Fatalf("掩码字段应保留库中原值，得到 %v", got)
+		t.Fatalf("마스크 필드는 라이브러리의 원래 값을 유지해야 하므로 %v가 발생합니다.", got)
 	}
 	if got["method"] != "PUT" {
-		t.Fatalf("被修改的字段应生效，得到 %v", got["method"])
+		t.Fatalf("수정된 필드가 적용되고 %v를 받아야 합니다.", got["method"])
 	}
 }
 
@@ -95,11 +95,11 @@ func TestMergeConfigEmptyStringClears(t *testing.T) {
 	stored := map[string]any{"webhook": "https://real/hook", "secret": "REALSECRET"}
 	got := MergeConfig(stored, map[string]any{"secret": ""})
 	if _, ok := got["secret"]; ok {
-		t.Fatalf("空串应清空该字段，得到 %v", got)
+		t.Fatalf("빈 문자열은 이 필드를 지우고 %v를 가져와야 합니다.", got)
 	}
-	// 没提到的字段保留（局部更新语义）。
+	// 언급되지 않은 필드는 유지됩니다(로컬 업데이트 의미).
 	if got["webhook"] != "https://real/hook" {
-		t.Fatalf("未提及的字段应保留，得到 %v", got)
+		t.Fatalf("언급되지 않은 필드는 유지되어야 하며 %v를 가져옵니다.", got)
 	}
 }
 
@@ -107,29 +107,29 @@ func TestMergeConfigKeepsUnmentionedStoredKeys(t *testing.T) {
 	stored := map[string]any{"host": "smtp.example.com", "port": float64(587), "password": "pw"}
 	got := MergeConfig(stored, map[string]any{"port": float64(465)})
 	if got["host"] != "smtp.example.com" || got["password"] != "pw" {
-		t.Fatalf("未提及的字段应保留，得到 %v", got)
+		t.Fatalf("언급되지 않은 필드는 유지되어야 하며 %v를 가져옵니다.", got)
 	}
 	if got["port"] != float64(465) {
-		t.Fatalf("已提及的字段应更新，得到 %v", got["port"])
+		t.Fatalf("언급된 필드를 업데이트하여 %v를 가져와야 합니다.", got["port"])
 	}
 }
 
-// TestPrepareConfigUpdateBlocksDestinationSwap 是本包最重要的一条安全不变量：
-// **改目标地址不能把旧凭据带过去**。
+// TestPrepareConfigUpdateBlocksDestinationSwap는 이 패키지의 가장 중요한 보안 불변입니다.
+// **대상 주소를 변경할 때 기존 자격 증명을 가져올 수 없습니다**.
 //
-// 这些用例用的正是攻击形状的输入（只改地址、对凭据避而不谈），
-// 而不是「防御逻辑的正确输入」——只测后者的话，防御没生效也照样全绿。
+// 이러한 사용 사례는 정확히 동일한 공격 형태의 입력을 사용합니다(주소만 변경하고 자격 증명은 언급하지 않음).
+// "방어 논리의 올바른 입력"보다는 - 후자만 테스트하면 방어가 적용되지 않더라도 방어는 여전히 모두 녹색입니다.
 func TestPrepareConfigUpdateBlocksDestinationSwap(t *testing.T) {
 	cases := []struct {
 		name     string
 		kind     string
 		stored   map[string]any
 		incoming map[string]any
-		// wantMissing 是预期被点名的凭据键。
+		// wantMissing는 이름이 지정될 자격 증명 키입니다.
 		wantMissing string
 	}{
 		{
-			name: "通用 Webhook 改地址想沿用 Authorization 头",
+			name: "일반 Webhook 주소를 변경하려면 Authorization 헤더를 사용하면 됩니다.",
 			kind: KindWebhook,
 			stored: map[string]any{
 				"url":     "https://legit.example.com/hook",
@@ -139,36 +139,36 @@ func TestPrepareConfigUpdateBlocksDestinationSwap(t *testing.T) {
 			wantMissing: "headers",
 		},
 		{
-			name:        "Telegram 改 base_url 想把 Bot Token 发到自己的端点",
+			name:        "Telegram를 base_url로 변경하고 Bot Token를 자신의 엔드포인트로 보내려고 합니다.",
 			kind:        KindTelegram,
 			stored:      map[string]any{"bot_token": "123456:REAL", "chat_id": "1", "base_url": "https://api.telegram.org"},
 			incoming:    map[string]any{"base_url": "https://attacker.tld"},
 			wantMissing: "bot_token",
 		},
 		{
-			name:        "邮件改 SMTP 主机想交出密码",
+			name:        "이메일을 SMTP로 변경하세요. 호스트가 비밀번호를 넘겨주려고 합니다.",
 			kind:        KindEmail,
 			stored:      map[string]any{"host": "smtp.corp.com", "port": 587, "password": "REALPW", "from": "a@b.c", "to": []any{"d@e.f"}},
 			incoming:    map[string]any{"host": "smtp.attacker.tld"},
 			wantMissing: "password",
 		},
 		{
-			name:        "邮件关掉 TLS 也必须重新表态密码",
+			name:        "이메일이 닫혔습니다. TLS 비밀번호를 다시 입력해야 합니다.",
 			kind:        KindEmail,
 			stored:      map[string]any{"host": "smtp.corp.com", "port": 587, "tls": false, "password": "REALPW", "from": "a@b.c", "to": []any{"d@e.f"}},
 			incoming:    map[string]any{"tls": true},
 			wantMissing: "password",
 		},
 		{
-			// 掩码值 = 「沿用旧凭据」，在地址变更的语境下同样必须拒绝。
-			name:        "回传掩码凭据 + 新地址",
+			// 마스크 값 = "이전 자격 증명 상속". 주소 변경 시에도 거부되어야 합니다.
+			name:        "패스백 마스크 자격 증명 + 새 주소",
 			kind:        KindTelegram,
 			stored:      map[string]any{"bot_token": "123456:REAL", "chat_id": "1", "base_url": "https://api.telegram.org"},
 			incoming:    map[string]any{"base_url": "https://attacker.tld", "bot_token": MaskedValue("123456:REAL")},
 			wantMissing: "bot_token",
 		},
 		{
-			name:        "钉钉改 Webhook 想沿用加签密钥",
+			name:        "DingTalk가 Webhook를 변경하고 서명 키를 계속 사용하려고 합니다.",
 			kind:        KindDingTalk,
 			stored:      map[string]any{"webhook": "https://oapi.dingtalk.com/robot/send?access_token=OLD", "secret": "REALSEC"},
 			incoming:    map[string]any{"webhook": "https://attacker.tld/hook"},
@@ -179,11 +179,11 @@ func TestPrepareConfigUpdateBlocksDestinationSwap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			merged, err := PrepareConfigUpdate(tc.kind, tc.stored, tc.incoming)
 			if err == nil {
-				t.Fatalf("改地址却未重新表态凭据，应当被拒绝；得到配置 %v", merged)
+				t.Fatalf("자격 증명을 다시 제시하지 않고 주소를 변경하는 것은 거부되어야 합니다. %v 구성하기", merged)
 			}
 			var target *ErrDestinationChangedWithoutCredentials
 			if !errors.As(err, &target) {
-				t.Fatalf("应返回专门的错误类型以便接口给出可操作提示，得到 %T: %v", err, err)
+				t.Fatalf("인터페이스가 실행 가능한 프롬프트를 제공할 수 있도록 특수 오류 유형이 반환되어야 합니다. %T: %v를 가져옵니다.", err, err)
 			}
 			found := false
 			for _, m := range target.Missing {
@@ -192,18 +192,18 @@ func TestPrepareConfigUpdateBlocksDestinationSwap(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Fatalf("应点名缺失的凭据键 %q，得到 %v", tc.wantMissing, target.Missing)
+				t.Fatalf("누락된 자격 증명 키의 이름을 %q로 지정하고 %v를 가져와야 합니다.", tc.wantMissing, target.Missing)
 			}
-			// 错误信息要能指导操作者怎么修。
+			// 오류 메시지는 운영자에게 오류 수정 방법을 안내할 수 있어야 합니다.
 			if !strings.Contains(err.Error(), tc.wantMissing) {
-				t.Errorf("错误信息应提到 %q: %v", tc.wantMissing, err)
+				t.Errorf("오류 메시지에는 %q: %v가 언급되어야 합니다.", tc.wantMissing, err)
 			}
 		})
 	}
 }
 
-// TestPrepareConfigUpdateAllowsLegitimateEdits 反向用例：正常的编辑不能被误拦，
-// 否则这个防护会因为「太烦」而被绕过或删掉。
+// TestPrepareConfigUpdateAllowsLegitimateEdits 반대 사용 사례: 실수로 일반 편집을 차단할 수 없습니다.
+// 그렇지 않으면 이 보호 기능은 "너무 짜증나기" 때문에 우회되거나 삭제됩니다.
 func TestPrepareConfigUpdateAllowsLegitimateEdits(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -212,37 +212,37 @@ func TestPrepareConfigUpdateAllowsLegitimateEdits(t *testing.T) {
 		incoming map[string]any
 	}{
 		{
-			name:     "只改名字（配置原样回传）",
+			name:     "이름만 변경하세요. (구성은 그대로 반환됩니다.)",
 			kind:     KindWebhook,
 			stored:   map[string]any{"url": "https://legit.example.com/hook", "headers": map[string]any{"Authorization": "Bearer REAL"}},
 			incoming: map[string]any{"url": MaskedValue("https://legit.example.com/hook")},
 		},
 		{
-			name:     "只改请求方法，地址与凭据都不动",
+			name:     "요청 방법만 변경되며 주소와 자격 증명은 변경되지 않습니다.",
 			kind:     KindWebhook,
 			stored:   map[string]any{"url": "https://legit.example.com/hook", "method": "POST"},
 			incoming: map[string]any{"method": "PUT"},
 		},
 		{
-			name:     "换地址并**同时**给新凭据",
+			name:     "주소를 변경하고 동시에 새 자격 증명을 제공하세요.",
 			kind:     KindWebhook,
 			stored:   map[string]any{"url": "https://old.example.com/hook", "headers": map[string]any{"Authorization": "Bearer OLD"}},
 			incoming: map[string]any{"url": "https://new.example.com/hook", "headers": map[string]any{"Authorization": "Bearer NEW"}},
 		},
 		{
-			name:     "换地址并显式声明不再需要凭据",
+			name:     "주소를 변경하고 자격 증명이 더 이상 필요하지 않음을 명시적으로 명시합니다.",
 			kind:     KindWebhook,
 			stored:   map[string]any{"url": "https://old.example.com/hook", "headers": map[string]any{"Authorization": "Bearer OLD"}},
 			incoming: map[string]any{"url": "https://new.example.com/hook", "headers": ""},
 		},
 		{
-			name:     "Telegram 改 chat_id（不是目的地）",
+			name:     "Telegram가 chat_id로 변경됩니다(대상 아님).",
 			kind:     KindTelegram,
 			stored:   map[string]any{"bot_token": "t", "chat_id": "1", "base_url": "https://api.telegram.org"},
 			incoming: map[string]any{"chat_id": "-100200"},
 		},
 		{
-			name:     "邮件改收件人（不是目的地）",
+			name:     "이메일 수신자 변경(대상 아님)",
 			kind:     KindEmail,
 			stored:   map[string]any{"host": "smtp.corp.com", "port": 587, "password": "PW", "from": "a@b.c", "to": []any{"x@y.z"}},
 			incoming: map[string]any{"to": []any{"new@y.z"}},
@@ -252,47 +252,47 @@ func TestPrepareConfigUpdateAllowsLegitimateEdits(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			merged, err := PrepareConfigUpdate(tc.kind, tc.stored, tc.incoming)
 			if err != nil {
-				t.Fatalf("合法编辑被误拦: %v", err)
+				t.Fatalf("실수로 차단된 합법적인 편집자: %v", err)
 			}
 			if merged == nil {
-				t.Fatal("应返回合并结果")
+				t.Fatal("병합된 결과가 반환되어야 합니다.")
 			}
 		})
 	}
 }
 
-// TestPrepareConfigUpdatePortTypeTolerance 覆盖一个容易误判的细节：
-// 前端提交的端口是 JSON number（float64），库里读回来也是 float64，
-// 但两个值的类型可能不同（如 int vs float64）。用 == 比较会把「没改」判成「改了」，
-// 从而对只改了名字的用户弹出「请重新填写密码」——假警报会让人不再信任这个防护。
+// TestPrepareConfigUpdatePortTypeTolerance는 잘못 판단하기 쉬운 세부 사항을 다룹니다.
+// 프런트 엔드에서 제출한 포트는 JSON number(float64)이고, 라이브러리에서 다시 읽은 포트도 float64입니다.
+// 그러나 두 값의 유형은 다를 수 있습니다(예: int vs float64). ==와 비교하면 "변경되지 않음"이 "변경됨"으로 판단됩니다.
+// 결과적으로 이름만 변경한 사용자에게는 "비밀번호를 다시 입력하십시오"라는 팝업이 표시됩니다. 잘못된 경보로 인해 사람들은 더 이상 이 보호 기능을 신뢰하지 않게 됩니다.
 func TestPrepareConfigUpdatePortTypeTolerance(t *testing.T) {
 	stored := map[string]any{"host": "smtp.corp.com", "port": float64(587), "password": "PW"}
-	// 同一个端口，以 int 形式提交。
+	// 동일한 포트가 int 형식으로 제출됩니다.
 	if _, err := PrepareConfigUpdate(KindEmail, stored, map[string]any{"port": 587}); err != nil {
-		t.Fatalf("端口值相同（仅类型不同）不应被判为地址变更: %v", err)
+		t.Fatalf("동일한 포트 값(타입만 다름)은 주소 변경으로 간주하면 안 됩니다: %v", err)
 	}
-	// 真的换了端口则必须拦。
+	// 포트가 실제로 변경된 경우에는 차단해야 합니다.
 	if _, err := PrepareConfigUpdate(KindEmail, stored, map[string]any{"port": 25}); err == nil {
-		t.Fatal("端口变更应被拦下")
+		t.Fatal("포트 변경을 차단해야 합니다.")
 	}
 }
 
-// TestPrepareConfigUpdateSurvivesRepeatedSaveWithBlankDestination 覆盖「可留空的
-// 目的地字段」这条路径：Telegram 的 base_url 留空表示用官方 API 地址。
+// TestPrepareConfigUpdateSurvivesRepeatedSaveWithBlankDestination 커버 "비워둘 수 있습니다.
+// "대상 필드" 경로: Telegram의 base_url. 공식 API 주소를 사용하려면 공백으로 남겨두세요.
 //
-// 曾经这里会让渠道从第二次保存起永久保存失败：
+// 이는 채널이 두 번째 저장에서 영구적으로 저장되지 못하게 만드는 데 사용되었습니다.
 //
-//	新建时库里存下 base_url:""（创建路径直接存前端提交的 config，不走 MergeConfig）
-//	→ 第一次保存，MergeConfig 把空串当显式清空、delete 掉该键
-//	→ 第二次保存，incoming 仍是 ""、而 stored 里已经没这个键，被判成「地址变了」
-//	→ bot_token 是掩码回显值 → 400「目标地址已变更，请同时重新填写凭据字段」
+//	새 경로를 생성할 때 base_url:""를 라이브러리에 저장합니다. (생성된 경로는 프런트 엔드에서 제출한 config를 직접 저장하고 MergeConfig를 사용하지 않습니다.)
+//	→ 처음 저장할 때 MergeConfig는 빈 문자열을 명시적 클리어로 처리하고 delete는 키를 제거합니다.
+//	→ 두 번째로 저장하면 incoming는 여전히 ""이지만 stored에는 더 이상 이 키가 없으며 "주소 변경됨"으로 판단됩니다.
+//	→ bot_token는 마스크 에코 값 → 400 "대상 주소가 변경되었습니다. 동시에 자격 증명 필드를 다시 채워주십시오."
 //
-// 用户什么都没改，却从此再也存不上，除非重新粘贴一遍 Bot Token。
+// 사용자는 아무것도 변경하지 않았지만 Bot Token를 다시 붙여넣지 않으면 더 이상 저장할 수 없습니다.
 func TestPrepareConfigUpdateSurvivesRepeatedSaveWithBlankDestination(t *testing.T) {
 	stored := map[string]any{"bot_token": "123:ABC", "chat_id": "-100", "base_url": ""}
 
-	// 前端 buildConfig() 对该渠道的每个字段定义都提交一个值：凭据回填掩码，
-	// 空文本框提交空串。这里完整复现它的输出，而不是只提交「改动的键」。
+	// 프런트엔드 buildConfig()는 이 채널의 각 필드 정의에 대한 값(Credential Backfill Mask, Credential Backfill Mask)을 제출합니다.
+	// 빈 텍스트 상자는 빈 문자열을 제출합니다. 다음은 "변경된 키"를 제출하는 것이 아니라 출력을 완전히 재현한 것입니다.
 	submit := func() map[string]any {
 		return map[string]any{
 			"bot_token": MaskedValue("123:ABC"),
@@ -301,103 +301,103 @@ func TestPrepareConfigUpdateSurvivesRepeatedSaveWithBlankDestination(t *testing.
 		}
 	}
 
-	// 第一次保存：只改了渠道名字，config 原样回传。
+	// 첫 번째 저장: 채널 이름만 변경되고, config가 그대로 반환됩니다.
 	merged, err := PrepareConfigUpdate(KindTelegram, stored, submit())
 	if err != nil {
-		t.Fatalf("第一次保存被误拦: %v", err)
+		t.Fatalf("첫 번째 저장이 실수로 차단되었습니다: %v", err)
 	}
 	if _, ok := merged["base_url"]; ok {
-		t.Fatal("前提已变：空串应被 MergeConfig 删除——本用例要覆盖的正是「键消失之后」那一步")
+		t.Fatal("전제가 변경되었습니다. 빈 문자열은 MergeConfig에 의해 삭제되어야 합니다. 이 사용 사례에서 다루고자 하는 것은 ＂키가 사라진 후＂ 단계입니다.")
 	}
 
-	// 第二次保存：提交内容与上次完全一致，用户什么都没改。
+	// 두 번째 저장: 제출된 콘텐츠는 지난번과 정확히 동일하며 사용자가 아무것도 변경하지 않았습니다.
 	merged2, err := PrepareConfigUpdate(KindTelegram, merged, submit())
 	if err != nil {
-		t.Fatalf("第二次保存被误拦（用户什么都没改）: %v", err)
+		t.Fatalf("두 번째 저장이 실수로 차단되었습니다(사용자가 아무것도 변경하지 않음): %v", err)
 	}
-	// 第三次，确认不是「只错一次」而是稳定可保存。
+	// 세 번째에서는 '한 번만 틀렸다'가 아니라 안정적이고 저장이 가능한 것으로 확인됐다.
 	if _, err := PrepareConfigUpdate(KindTelegram, merged2, submit()); err != nil {
-		t.Fatalf("第三次保存被误拦: %v", err)
+		t.Fatalf("세 번째 저장이 실수로 차단되었습니다: %v", err)
 	}
-	// 凭据必须一路保留下来，没有被空串逻辑连带清掉。
+	// 자격 증명은 항상 보존되어야 하며 빈 문자열 논리로 지워지지 않아야 합니다.
 	if got := merged2["bot_token"]; got != "123:ABC" {
-		t.Fatalf("Bot Token 应沿用原值，得到 %v", got)
+		t.Fatalf("Bot Token는 %v를 얻으려면 원래 값을 사용해야 합니다.", got)
 	}
 }
 
-// TestPrepareConfigUpdateStillGuardsBlankDestinationChanges 是上一条用例的配对
-// 断言：把空串与「键不存在」视为等价，**不能**连带放过真正的地址变更。
-// 这两个方向都是真实的凭据外发路径——Telegram 的 Bot Token 走在 URL 路径里，
-// 换了 base_url 就等于把 Token 送给新地址。
+// TestPrepareConfigUpdateStillGuardsBlankDestinationChanges는 이전 사용 사례의 페어링입니다.
+// 주장: 빈 문자열을 "키가 존재하지 않습니다"와 동일하게 취급하고 실제 주소 변경을 포기할 수 없습니다.
+// 두 방향 모두 실제 자격 증명 나가는 경로입니다. Telegram 및 Token의 Bot는 URL 경로에 있습니다.
+// base_url를 변경하는 것은 Token를 새 주소에 부여하는 것과 같습니다.
 func TestPrepareConfigUpdateStillGuardsBlankDestinationChanges(t *testing.T) {
-	// 方向一：从「空」（官方地址）换到自建地址。
+	// 방향 1: "비어 있는"(공식 주소)에서 자체 생성된 주소로 변경합니다.
 	official := map[string]any{"bot_token": "123:ABC", "chat_id": "-100"}
 	if _, err := PrepareConfigUpdate(KindTelegram, official, map[string]any{
 		"bot_token": MaskedValue("123:ABC"),
 		"base_url":  "https://tg-proxy.attacker.tld",
 	}); err == nil {
-		t.Fatal("从官方地址换到自建地址必须要求重新填写 Token")
+		t.Fatal("공식 주소에서 자체 구축 주소로 변경 시 Token를 채워야 합니다.")
 	}
 
-	// 方向二：把自建地址清空（= 换回官方 API）同样是地址变更。
+	// 방향 2: 자체 생성된 주소를 지우고(= 공식 API로 다시 변경), 이것도 주소 변경입니다.
 	proxied := map[string]any{"bot_token": "123:ABC", "base_url": "https://proxy.internal/bot"}
 	if _, err := PrepareConfigUpdate(KindTelegram, proxied, map[string]any{
 		"bot_token": MaskedValue("123:ABC"),
 		"base_url":  "",
 	}); err == nil {
-		t.Fatal("清空自建地址（换回官方 API）同样是地址变更，必须要求重新填写 Token")
+		t.Fatal("자체 생성된 주소를 지우는 것(공식 API로 돌아가는 것)도 주소 변경이므로 Token를 다시 채워야 합니다.")
 	}
 }
 
 func TestDestinationKeysDeclaredForEveryKind(t *testing.T) {
-	// 与 SecretKeys 同理：渠道若忘记声明目的地键，PrepareConfigUpdate 就保护不到它。
+	// SecretKeys와 동일: 채널이 대상 키 선언을 잊어버린 경우 PrepareConfigUpdate는 채널을 보호할 수 없습니다.
 	for kind, ch := range registry {
 		if len(ch.DestinationKeys()) == 0 {
-			t.Errorf("渠道 %s 未声明目的地键，改地址带出凭据的防护对它无效", kind)
+			t.Errorf("채널 %s는 대상 키를 선언하지 않으며 주소 변경 및 자격 증명 가져오기 보호가 유효하지 않습니다.", kind)
 		}
 		if len(ch.SecretKeys()) == 0 {
-			t.Errorf("渠道 %s 未声明凭据键", kind)
+			t.Errorf("채널 %s 자격 증명 키가 선언되지 않았습니다.", kind)
 		}
 	}
 }
 
 func TestSecretKeysDeclaredForEveryKind(t *testing.T) {
-	// 编译器已经强制每个渠道实现 SecretKeys，这里再确认一遍「没有渠道在掩码上
-	// 交白卷」——返回空切片的渠道意味着它的凭据会明文回显到浏览器。
+	// 컴파일러는 각 채널이 SecretKeys를 구현하도록 강제했습니다. 또 다른 확인 사항은 다음과 같습니다. "마스크에 채널이 없습니다."
+	// "Hand in 공백" - 빈 조각을 반환하는 채널은 해당 자격 증명이 브라우저에 일반 형식으로 표시된다는 의미입니다.
 	expect := map[string]bool{
 		KindDingTalk: true, KindFeishu: true, KindWeCom: true,
 		KindWebhook: true, KindTelegram: true, KindEmail: true,
 	}
 	for kind, ch := range registry {
 		if !expect[kind] {
-			t.Errorf("渠道 %s 未在测试中登记掩码预期", kind)
+			t.Errorf("채널 %s가 테스트에서 마스크 기대치를 등록하지 않았습니다.", kind)
 			continue
 		}
 		if len(ch.SecretKeys()) == 0 {
-			t.Errorf("渠道 %s 未声明任何凭据字段，其配置会明文回显", kind)
+			t.Errorf("채널 %s는 자격 증명 필드를 선언하지 않으며 해당 구성은 일반 텍스트로 표시됩니다.", kind)
 		}
 	}
 }
 
-// TestPrepareConfigUpdateRejectsMaskedInContainer 覆盖审计指出的一处口子：
-// 把掩码哨兵塞进**非字符串**结构（如 webhook.headers 是个对象）时，
-// MergeConfig 只认「字符串且带前缀」为掩码，于是字面量 "__masked__" 会被当成
-// 真实头值存进库——后续鉴权静默失效，且没有任何报错。
+// TestPrepareConfigUpdateRejectsMaskedInContainer 커버리지 감사에서 지적된 결함:
+// 마스크된 센티넬을 **문자열이 아닌** 구조(예: webhook.headers가 객체임)에 넣을 때,
+// MergeConfig는 "접두사가 있는 문자열"만 마스크로 인식하므로 리터럴 "__masked__"는 다음과 같이 간주됩니다.
+// 실제 헤더 값은 데이터베이스에 저장됩니다. 후속 인증은 오류 없이 자동으로 실패합니다.
 func TestPrepareConfigUpdateRejectsMaskedInContainer(t *testing.T) {
 	stored := map[string]any{
 		"url":     "https://legit.example.com/hook",
 		"headers": map[string]any{"Authorization": "Bearer REAL"},
 	}
-	// 对象内部夹带掩码哨兵。
+	// 개체 내부 동반 마스크 보초.
 	incoming := map[string]any{
 		"headers": map[string]any{"Authorization": MaskedPrefix},
 	}
 	if _, err := PrepareConfigUpdate(KindWebhook, stored, incoming); err == nil {
-		t.Fatal("结构体内部夹带掩码哨兵应被拒绝（否则会把字面量存进库）")
+		t.Fatal("구조 내부의 마스크된 센티널은 거부되어야 합니다(그렇지 않으면 리터럴이 라이브러리에 저장됩니다).")
 	}
-	// 整体提交对象（真实新值）照常接受。
+	// 전체 커밋 개체(실제 새 값)는 평소와 같이 허용됩니다.
 	ok := map[string]any{"headers": map[string]any{"Authorization": "Bearer NEW"}}
 	if _, err := PrepareConfigUpdate(KindWebhook, stored, ok); err != nil {
-		t.Fatalf("正常提交新请求头不应被拦: %v", err)
+		t.Fatalf("새로운 요청 헤더의 정상적인 제출이 차단되어서는 안 됩니다: %v", err)
 	}
 }

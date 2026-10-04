@@ -14,18 +14,18 @@ func noaWarn(session string) func(string) {
 	return func(msg string) { log.Printf("[noa] %s: %s", session, msg) }
 }
 
-// noa 是 norma v0.4.0 引入的「模型驱动上下文压缩」机制,作为平台实验功能由用户在
-// 系统设置中开关。它与内置 compaction 互斥:noaadapter.Enable 是唯一入口,一次挂上
-// 上下文接管器(Compactor)、Compress 工具与三段常驻提示词,不调用 Enable 即为关闭
-// (内置 compaction 照常工作)。开关由每个 agent 注入的 noaEnabledFn 解析,每 run 读
-// 一次,故切换只影响之后启动的 run,无需重建 agent。
+// noa는 norma v0.4.0에서 도입된 "모델 기반 컨텍스트 압축" 메커니즘입니다. 플랫폼 실험 기능으로 사용자는 다음을 수행할 수 있습니다.
+// 시스템 설정을 전환하세요. 내장된 compaction와 상호 배타적입니다. noaadapter.Enable는 유일한 항목이며 한 번 장착할 수 있습니다.
+// Enable가 호출되지 않으면 컨텍스트 인계(Compactor), Compress 도구 및 상주 프롬프트 단어 3개가 닫힙니다.
+// (내장 compaction는 평소와 같이 작동합니다). 스위치는 agent마다 삽입된 noaEnabledFn에 의해 구문 분석되고 run에 의해 읽혀집니다.
+// 일단 스위치는 나중에 시작된 run에만 영향을 미치며 agent를 다시 빌드할 필요가 없습니다.
 
-// enableNoa 在解析器报告开启时把 noa 接入 opts。archiveRoot 是压缩原文的持久化基目录
-// (取全局 workDir,各 agent 统一落在 <workDir>/noa 下,不随任务/意图目录分散),sessionID
-// 命名其下的归档子目录(全局唯一,故同一基目录内不冲突)。
+// enableNoa 파서 보고가 활성화되면 noa를 opts에 연결합니다. archiveRoot는 압축된 원본 텍스트의 영구 기본 디렉터리입니다.
+// (전역 workDir를 사용하면 각 agent는 <workDir>/noa 아래에 균일하게 속하며 작업/의도 디렉터리와 함께 분산되지 않습니다.), sessionID
+// 그 아래 아카이브 하위 디렉터리의 이름을 지정합니다(전역적으로 고유하므로 동일한 기본 디렉터리 내에서 충돌이 발생하지 않음).
 //
-// noa 是实验功能:接入失败不得中断真实任务。发生错误时经 onWarn 上报并回退内置压缩。
-// 启用成功时清掉 opts.Compaction,避免 agentcore 因「两个上下文管理器同时设置」告警。
+// noa는 실험적인 기능입니다. 액세스 실패가 실제 작업을 중단해서는 안 됩니다. 오류가 발생하면 onWarn를 통해 보고되고 내장된 압축이 롤백됩니다.
+// "두 개의 컨텍스트 관리자가 동시에 설정됨"으로 인한 agentcore 경보를 방지하려면 성공적으로 활성화되면 opts.Compaction를 지우십시오.
 func enableNoa(opts *agentcore.Options, enabled func() bool, archiveRoot, sessionID string, onWarn func(string)) {
 	if enabled == nil || !enabled() {
 		return
@@ -39,10 +39,10 @@ func enableNoa(opts *agentcore.Options, enabled func() bool, archiveRoot, sessio
 		OnWarn:         onWarn,
 	}); err != nil {
 		if onWarn != nil {
-			onWarn("noa 压缩启用失败,回退内置压缩:" + err.Error())
+			onWarn("noa 압축을 활성화하지 못했습니다. 내장 압축으로 대체:" + err.Error())
 		}
 		return
 	}
-	// Compactor 覆盖 Compaction,但两者并存时 agentcore 每次会告警;明确清掉。
+	// Compactor는 Compaction를 포함하지만 둘 다 공존하는 경우 agentcore는 매번 경보를 울립니다. 명확하게 정리하세요.
 	opts.Compaction = nil
 }
