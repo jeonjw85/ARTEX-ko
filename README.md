@@ -1,14 +1,14 @@
 <div align="center">
 
-# ARTEX-ko · 한국어판
+# ARTEX-ko
 
 AI 기반 자율 모의 침투 테스트 시스템(Go 백엔드 + Next.js 프런트엔드)
 
-**한국어화 포크**: [jeonjw85/ARTEX-ko](https://github.com/jeonjw85/ARTEX-ko)
+**한글화 포크**: [jeonjw85/ARTEX-ko](https://github.com/jeonjw85/ARTEX-ko)
 
 **원본 프로젝트**: [Autumn-27/ARTEX](https://github.com/Autumn-27/ARTEX)
 
-원본 ARTEX를 포크하여 사용자 화면, 문서, AI 안내, 서버 메시지와 실행 스크립트를 한국어화한 프로젝트입니다.
+원본 프로젝트를 포크하여 사용자 화면, 문서, AI 안내, 서버 메시지와 실행 스크립트를 중국어에서 한글화한 프로젝트
 
 🌐 **원본 온라인 데모**: [https://artex-demo.vercel.app/](https://artex-demo.vercel.app/)
 
