@@ -1,0 +1,7 @@
+services:
+  artex:
+    image: artex-ko:local
+    pull_policy: build
+    build:
+      context: .
+      target: local

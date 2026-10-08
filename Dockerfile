@@ -1,17 +1,10 @@
 # syntax=docker/dockerfile:1
 #
-# 이미지 실행(이미지에서 컴파일하지 않음): 일반 도구만 설치하고**미리 컴파일된 Linux 단일 바이너리**。
-# 바이너리 기준 CI ~의 binaries job 크로스 컴파일(순수 Go、없음 QEMU），대상 아키텍처에 따라 배치
-# 맥락 구축 dist/<TARGETARCH>/artex。이러한 다중 아키텍처를 구축할 때 arm64 그냥 시뮬레이션해 보세요 apt 층，
-# 더 이상 시뮬레이션이 필요하지 않습니다. Next/Go 훨씬 더 빠른 컴파일。
-#
-# 로컬에서 이미지를 수동으로 빌드하는 경우 먼저 바이너리를 직접 준비하세요.：
-#   cd web && npm run build:static && cd ..
-#   cp -r web/out server/webui/dist
-#   CGO_ENABLED=0 GOARCH=amd64 go build -tags embedui -o dist/amd64/artex ./cmd/artex
-#   docker build -t artex:local .
-FROM python:3.12-slim-bookworm
-ARG TARGETARCH
+# 기본 release 타깃은 CI가 준비한 dist/<TARGETARCH>/artex를 사용합니다.
+# local 타깃은 현재 소스의 프런트엔드와 Go 백엔드를 이미지 안에서 빌드합니다.
+#   docker compose up -d --build
+#   docker build --target local -t artex-ko:local .
+FROM python:3.12-slim-bookworm AS runtime
 # 일반적인 도구：ripgrep / curl / vim，배치 추가 recon 일반 예비 부품(필요에 따라 추가 또는 삭제)）。
 # Node ~에서 NodeSource 팩 20.x：bookworm 함께 제공됩니다 apt nodejs 예 18，Playwright 필요하다 >=20。
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,16 +23,44 @@ RUN npm install -g @playwright/mcp@latest @playwright/cli@latest playwright@late
     && playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-# 사전 컴파일된 해당 아키텍처 바이너리（dist/amd64/artex 또는 dist/arm64/artex）
-COPY dist/${TARGETARCH}/artex /app/artex
 # Guardian 시작 스크립트: 프로세스가 종료된 후 종료 코드를 눌러 다시 시작할지 여부를 결정하고 이에 따라 페이지의 원클릭 업데이트를 완료합니다.。
 # 또한 책임이 있습니다 SIGTERM 앞으로 artex —— docker stop 다음으로만 신호를 보냅니다. PID 1，
 # 전달하지 않으면 artex 정상적으로 수신하고 닫을 수 없습니다.，10 몇 초 후 SIGKILL 하드 킬。
 COPY start.sh /app/start.sh
-RUN chmod +x /app/artex /app/start.sh
+RUN chmod +x /app/start.sh
 COPY skills/ /app/skills/
 # data/（SQLite + jwt.key）지속성 지점
 VOLUME ["/app/data"]
 EXPOSE 8787 8788
 ENTRYPOINT ["/app/start.sh"]
 CMD ["-addr", ":8787", "-proxy", ":8788"]
+
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS frontend
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm HUSKY=0 npm ci
+COPY web/ ./
+RUN NEXT_TELEMETRY_DISABLED=1 npm run build:static
+
+FROM --platform=$BUILDPLATFORM golang:1.26.3-bookworm AS backend
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY . .
+COPY --from=frontend /src/web/out/ ./server/webui/dist/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -tags embedui -trimpath -ldflags "-s -w" -o /out/artex ./cmd/artex
+
+FROM runtime AS local
+COPY --from=backend /out/artex /app/artex
+RUN chmod +x /app/artex
+
+# 마지막 타깃을 release로 유지하여 기존 CI 빌드 방식을 보존합니다.
+FROM runtime AS release
+ARG TARGETARCH
+COPY dist/${TARGETARCH}/artex /app/artex
+RUN chmod +x /app/artex

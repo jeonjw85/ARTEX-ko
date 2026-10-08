@@ -71,9 +71,35 @@ AI 기반 자율 모의 침투 테스트 시스템(Go 백엔드 + Next.js 프런
 
 > **PostgreSQL**이 필요합니다. AI 탐색에는 **LLM** 설정이 필요하며 `ANTHROPIC_API_KEY` 또는 `OPENAI_API_KEY`를 사용하거나 화면에서 설정할 수 있습니다.
 
-**한국어판 실행**: 이 저장소의 번역을 반영하려면 아래의 **소스 코드 빌드 방식**을 사용하거나 `./install.sh`에서 **② 로컬 빌드 및 실행**을 선택하세요. 공식 Docker 이미지와 Releases 바이너리는 별도로 배포된 버전입니다.
+**한국어판 실행**: 이 저장소의 소스로 이미지를 빌드하는 **Docker Compose 방식**을 권장합니다. `docker-compose.override.yml`이 자동으로 적용되어 한글 프런트엔드와 Go 백엔드를 빌드하고 `artex-ko:local` 이미지로 실행합니다. 원본 공식 Docker 이미지와 Releases 바이너리는 이 저장소의 한글화를 포함하지 않을 수 있습니다.
 
-### 방법 1: 원클릭 설치 스크립트(권장)
+### 방법 1: Docker Compose 소스 빌드(권장)
+
+Docker와 Docker Compose가 필요합니다. macOS에서는 **OrbStack 또는 Docker Desktop**을 실행하세요. 컨테이너는 Linux 환경에서 동작하며 호스트에 Go나 Node.js를 따로 설치할 필요가 없습니다.
+
+```bash
+git clone https://github.com/jeonjw85/ARTEX-ko.git
+cd ARTEX-ko
+cp .env.example .env
+chmod 600 .env
+# 다음 명령을 실행하기 전에 .env의 POSTGRES_PASSWORD를 충분히 긴 임의의 값으로 변경하세요.
+# LLM API 키는 비워 두고 나중에 화면에서 설정해도 됩니다.
+docker compose up -d --build
+docker compose ps
+```
+
+기존 `.env`가 있으면 복사하지 말고 그대로 사용하세요. 최초 빌드는 기본 이미지, npm/Go 의존성, Playwright·Chromium을 내려받으므로 네트워크 상태에 따라 오래 걸릴 수 있습니다. 다음 빌드부터는 캐시를 재사용합니다.
+
+설치 후 **http://localhost:8787/setup**에서 관리자 비밀번호를 설정하세요. DB 비밀번호와 관리자 로그인 비밀번호는 별개입니다. 로그는 `docker compose logs -f artex`로 확인할 수 있습니다.
+
+이미지에는 ripgrep, curl, vim, npm, nmap, Playwright·Chromium 등 도구가 포함됩니다. PostgreSQL 데이터는 `pgdata` 볼륨에, 프로그램 데이터와 스킬은 `./data`와 `./skills`에 저장됩니다. 기본 웹 포트 `8787`은 모든 인터페이스에, 트래픽 프록시 `8788`은 `127.0.0.1`에 공개됩니다.
+
+원격 MCP 연결 방식은 시스템 설정에서 `http`(Streamable HTTP) 또는 `sse`(기존 SSE)로 선택합니다.
+기존 SSE 서비스는 보통 `GET /sse`로 이벤트 스트림을 생성하고, 서버가 반환한
+`/message?sessionId=...` 주소로 JSON-RPC 요청을 받습니다. URL에는 `/sse` 주소를,
+요청 헤더에는 `Authorization=Bearer <token>`을 입력하세요.
+
+### 방법 2: 설치 스크립트
 
 ```bash
 git clone https://github.com/jeonjw85/ARTEX-ko.git
@@ -81,49 +107,33 @@ cd ARTEX-ko
 ./install.sh
 ```
 
-스크립트가 Docker를 확인하고 필요하면 자동 설치한 뒤 **① 전체 Docker 배포** 또는 **② 로컬 빌드 및 실행** 방식을 안내합니다.
+스크립트는 Docker를 확인하고 **① Docker 소스 빌드 및 실행** 또는 **② 호스트에서 로컬 빌드 및 실행**을 안내합니다. Linux에서는 Docker 자동 설치를 선택할 수 있으며, macOS에서는 OrbStack 또는 Docker Desktop을 먼저 실행해야 합니다.
 
-- **① 전체 Docker 배포**: PostgreSQL 비밀번호 입력(Enter로 임의 생성 가능) → `.env` 자동 생성 → `docker compose up -d` 실행.
-- **② 로컬 실행**: 기존 데이터베이스에 연결하거나 Docker로 새 데이터베이스 실행 → `config.json` 생성 → 프런트엔드를 포함한 Go 단일 바이너리 빌드 → 실행.
+- **① Docker**: DB 비밀번호 입력(Enter로 임의 생성 가능) → `.env` 생성 → `docker compose up -d --build`로 한글 소스 이미지 빌드 및 실행. 기존 `.env`는 유지합니다.
+- **② 로컬**: 기존 DB에 연결하거나 Docker로 DB 실행 → `config.json` 생성 → 호스트의 Go·Node.js로 빌드 및 실행. 이 방식의 ARTEX 실행 환경은 호스트 OS입니다.
 
-설치 후 **http://localhost:8787**에 접속하세요. 최초 접속 시 `/setup`에서 관리자 비밀번호를 설정합니다.
+### 방법 3: 원본 Releases 바이너리 다운로드
 
-### 방법 2: Docker Compose(수동)
-
-```bash
-git clone https://github.com/jeonjw85/ARTEX-ko.git
-cd ARTEX-ko
-cp .env.example .env          # POSTGRES_PASSWORD를 입력하고 선택적으로 ANTHROPIC_API_KEY를 입력하세요.
-docker compose up -d          # autumn27/artex 이미지 + postgres 가져오기
-# → http://localhost:8787
-```
-
-이미지에는 ripgrep, curl, vim, npm, nmap 등 자주 사용하는 도구가 포함되어 있습니다. `./skills`와 `./data`는 바인드 마운트로 영구 저장됩니다.
-
-원격 MCP 연결 방식은 시스템 설정에서 `http`(Streamable HTTP) 또는 `sse`(기존 SSE)로 선택합니다.
-기존 SSE 서비스는 보통 `GET /sse`로 이벤트 스트림을 생성하고, 서버가 반환한
-`/message?sessionId=...` 주소로 JSON-RPC 요청을 받습니다. URL에는 `/sse` 주소를,
-요청 헤더에는 `Authorization=Bearer <token>`을 입력하세요.
-
-### 방법 3: 미리 컴파일된 바이너리(Releases) 다운로드
-
-[Releases](https://github.com/Autumn-27/ARTEX/releases)로 이동하여 해당 플랫폼에 맞는 zip를 다운로드하세요. 압축을 풀면 `artex` + `start.sh`(Windows는 `start.bat`임) + `skills/` + `config.example.json`를 얻습니다.
+[원본 프로젝트 Releases](https://github.com/Autumn-27/ARTEX/releases)에서 해당 플랫폼의 zip를 다운로드하세요. **이 한글화 포크의 빌드가 아닙니다.** 압축을 풀면 `artex` + `start.sh`(Windows는 `start.bat`임) + `skills/` + `config.example.json`를 얻습니다.
 
 ```bash
 cp config.example.json config.json   # database 연결을 입력하세요.
 ./start.sh                           # → http://localhost:8787
 ```
 
-> `start.sh` 또는 `start.bat`로 실행하세요. 이 스크립트는 프로그램의 종료 코드에 따라 재시작 여부를 결정합니다. **화면의 [원클릭 업데이트](#방법-1-페이지에서-원클릭-업데이트권장)는 이 스크립트가 새 바이너리로 교체하고 재시작하는 방식으로 동작합니다.** `./artex`를 직접 실행하면 업데이트 후 자동으로 재시작되지 않습니다.
+> `start.sh` 또는 `start.bat`로 실행하세요. 이 스크립트는 프로그램의 종료 코드에 따라 재시작 여부를 결정합니다. **화면의 [원클릭 업데이트](#업데이트-및-업그레이드)는 이 스크립트가 새 바이너리로 교체하고 재시작하는 방식으로 동작합니다.** `./artex`를 직접 실행하면 업데이트 후 자동으로 재시작되지 않습니다.
 > 백그라운드 실행: `nohup ./start.sh >artex.log 2>&1 &`.
 
 ### 방법 4: 소스 코드에서 단일 바이너리 컴파일
+
+호스트에 Go 1.26.3 이상, Node.js 22 이상, npm과 rsync가 필요합니다. `config.json` 또는 `ARTEX_PG_DSN`으로 PostgreSQL 연결을 설정하세요.
 
 ```bash
 # 1) 프런트엔드 정적 내보내기
 cd web && npm ci && npm run build:static && cd ..
 # 2) 임베디드 디렉토리에 복사
-cp -r web/out server/webui/dist
+mkdir -p server/webui/dist
+rsync -a --delete web/out/ server/webui/dist/
 # 3) 빌드(-tags embedui 옵션으로 프런트엔드 포함)
 CGO_ENABLED=0 go build -tags embedui -o artex ./cmd/artex
 ./start.sh
@@ -145,13 +155,50 @@ ARTEX_TARGETS=linux/amd64,windows/amd64 ./build.sh --release
 ./build.sh --target linux/amd64 --upx
 ```
 
+### 원본 공식 Docker 이미지 사용(선택 사항)
+
+한글 소스 빌드가 아닌 원본 이미지를 실행하려면 `.env`를 설정한 뒤 기본 Compose 파일만 명시하세요. 이 명령은 로컬 빌드용 override 파일을 적용하지 않습니다.
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+이 경우에만 `.env`의 `ARTEX_TAG`로 원본 이미지 버전을 선택합니다. 기본 한글 소스 빌드는 현재 체크아웃한 소스를 사용하며 `ARTEX_TAG`를 사용하지 않습니다.
+
 ---
 
 ## 업데이트 및 업그레이드
 
 > 업그레이드 중에는 프로그램만 변경되고 데이터는 변경되지 않습니다. Postgres 데이터 볼륨 `pgdata`, `./data`(jwt.key / SQLite 등) 및 `./skills`는 유지됩니다. **데이터베이스 마이그레이션은 수동으로 수행할 필요가 없습니다** - `artex`는 시작될 때마다, 즉 "다시 시작 및 마이그레이션"할 때마다 `schema.sql`(`ADD COLUMN` / `CREATE INDEX IF NOT EXISTS` 포함)를 멱등적으로 다시 실행합니다. 업그레이드하기 전에 `./data`와 데이터베이스를 백업하는 것이 좋습니다.
 
-### 방법 1: 페이지에서 원클릭 업데이트(권장)
+### 방법 1: Docker Compose 소스 재빌드(권장)
+
+한글판은 최신 소스를 받아 다시 빌드하세요. 기본 Docker 소스 빌드는 `dev` 버전으로 실행되며 원본 릴리스로 교체하는 화면의 원클릭 업데이트는 비활성화됩니다.
+
+```bash
+cd ARTEX-ko
+git pull --ff-only
+docker compose up -d --build artex
+docker compose ps
+```
+
+`artex`만 소스에서 재빌드하고 다시 시작합니다. 기존 `.env`, PostgreSQL 데이터 볼륨, `./data`, `./skills`는 유지하세요. **`docker compose down -v`는 DB 볼륨을 삭제하므로 업데이트에 사용하지 마세요.**
+
+### 방법 2: 업데이트 스크립트
+
+```bash
+cd ARTEX-ko
+./update.sh
+```
+
+먼저 **① Docker** 또는 **② 로컬** 실행 방식을 선택한 뒤, 최신 소스를 `git pull --ff-only`로 가져올지 선택합니다. 소스 가져오기를 건너뛰면 현재 소스로 빌드합니다.
+
+- **① Docker**: `docker compose up -d --build artex`로 한글 소스 이미지를 재빌드하고 실행합니다. 원본 이미지 태그를 묻거나 이미지를 가져오지 않습니다.
+- **② 로컬**: 호스트에서 프런트엔드와 Go 바이너리를 다시 빌드합니다. 적용하려면 실행 중인 ARTEX 프로세스를 다시 시작하세요.
+
+### 방법 3: 페이지에서 원클릭 업데이트(원본 릴리스)
+
+아래 안내는 원본 릴리스 바이너리 또는 공식 이미지에 해당합니다. **한글 소스 빌드의 업데이트에는 위의 재빌드 방식을 사용하세요.**
 
 **시스템 설정** 페이지(`/system/settings`)의 **버전 및 업데이트** 카드에서 새 버전을 확인하고 설치할 수 있습니다.
 
@@ -161,33 +208,10 @@ ARTEX_TARGETS=linux/amd64,windows/amd64 ./build.sh --release
 - **언제든지 롤백**: 이전 버전은 `artex.old`로 유지되며, 카드에 "이전 버전으로 롤백"이 있습니다. 데이터베이스 구조는 롤백되지 않습니다.
 - **업데이트 시 실행 중인 작업 중단**: 업데이트는 재시작을 포함하므로 작업이 없을 때 진행하세요.
 - **개발 빌드는 업데이트되지 않습니다**: 버전 번호가 접미사가 있는 `dev` 또는 `git describe`인 경우 공식 버전이 로컬 디버깅 바이너리를 덮어쓰는 것을 방지하기 위해 비활성화됩니다.
-- **Docker 환경에서는 프로그램만 교체**: 이미지의 Playwright·nmap 등은 함께 업그레이드되지 않습니다. `docker compose up -d`로 컨테이너를 다시 생성하면 이미지에 포함된 프로그램 버전으로 돌아갑니다. 이미지까지 업그레이드하려면 `docker compose pull artex && docker compose up -d artex`를 실행하세요.
+- **공식 Docker 이미지에서는 프로그램만 교체**: 이미지의 Playwright·nmap 등은 함께 업그레이드되지 않습니다. 컨테이너를 다시 생성하면 이미지에 포함된 프로그램 버전으로 돌아갑니다. 공식 이미지까지 업그레이드하려면 `docker compose -f docker-compose.yml pull artex && docker compose -f docker-compose.yml up -d artex`를 실행하세요.
 - GitHub에 액세스하려면 프록시가 필요한 경우 동일한 페이지에서 **글로벌 프록시**를 구성하면 업데이트된 링크가 이를 사용합니다. 업데이트는 GitHub 도메인에서만 다운로드되며 HTTPS를 강제 적용합니다.
 
-### 방법 2: 업데이트 스크립트
-
-```bash
-cd ARTEX-ko
-./update.sh
-```
-
-스크립트는 먼저 `git pull`를 선택하여 최신 코드를 가져온 다음 **① Docker 업데이트** 또는 **② 로컬 컴파일 업데이트**(`install.sh`에 해당)를 선택할 수 있습니다.
-
-- **① Docker**: 대상 이미지 tag를 지정할 수 있습니다(Enter를 눌러 `.env`에서 `ARTEX_TAG`를 상속합니다. 기본값은 `latest`입니다) → `docker compose pull` → `docker compose up -d`(새 이미지는 다시 시작한 후 자동으로 마이그레이션됩니다).
-- **② 로컬**: 프런트엔드 정적 파일 다시 빌드 → `./artex` 다시 빌드 → 프로세스를 재시작하여 적용.
-
-### 방법 3: Docker Compose(수동)
-
-```bash
-cd ARTEX-ko
-git pull                       # compose/스크립트 업데이트(선택 사항)
-# 버전 지정: .env에 ARTEX_TAG=v0.2.0를 설정합니다. 설정되지 않은 경우 latest를 사용하세요.
-docker compose pull artex
-docker compose up -d artex     # 새 이미지로 교체하고 다시 시작 → schema 자동 마이그레이션
-docker image prune -f          # 오래된 이미지 정리(선택 사항)
-```
-
-### 방법 4: 사전 컴파일된 바이너리(Releases)
+### 방법 4: 원본 Releases 바이너리 교체
 
 [Releases](https://github.com/Autumn-27/ARTEX/releases)로 이동하여 새 버전 zip를 다운로드하고 이전 프로세스를 중지하고 `artex` 및 `skills/`를 덮어쓴 다음(`config.json` 및 `data/` 유지) 다시 시작합니다.
 
@@ -201,7 +225,8 @@ cp -r <압축해제_디렉터리>/skills ./ && cp <압축해제_디렉터리>/ar
 ```bash
 git pull
 cd web && npm ci && npm run build:static && cd ..
-cp -r web/out server/webui/dist
+mkdir -p server/webui/dist
+rsync -a --delete web/out/ server/webui/dist/
 CGO_ENABLED=0 go build -tags embedui -o artex ./cmd/artex
 # ./start.sh 다시 시작
 ```

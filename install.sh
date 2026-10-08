@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ARTEX 설치 스크립트: ① 모두 Docker ② 로컬에서 컴파일 및 실행
+# ARTEX 설치 스크립트: ① Docker에서 소스 빌드 ② 로컬에서 컴파일 및 실행
 set -euo pipefail
 cd "$(cd "$(dirname "$0")" && pwd)"
 
@@ -18,14 +18,14 @@ ensure_docker(){
   warn "docker / docker compose가 감지되지 않음"
   case "$(uname -s)" in
     Linux)
-      if [ "$(ask ’Docker를 자동으로 설치하시겠습니까? (y/n)’ y)" = y ]; then
+      if [ "$(ask 'Docker를 자동으로 설치하시겠습니까? (y/n)' y)" = y ]; then
         curl -fsSL https://get.docker.com | sh
         sudo usermod -aG docker "$USER" || true
         ok "Docker 설치 완료(사용자 그룹 변경 시 sudo 방지를 위해 재로그인 필요)"
       else
         die "docker를 직접 설치하고 다시 시도해 보세요."
       fi ;;
-    Darwin) die "macOS Docker Desktop를 설치하십시오: https://www.docker.com/products/docker-desktop/" ;;
+    Darwin) die "macOS에서는 OrbStack 또는 Docker Desktop을 설치하고 실행하세요. docker와 docker compose 명령이 필요합니다." ;;
     *)      die "docker를 직접 설치하고 다시 시도해 보세요." ;;
   esac
 }
@@ -35,9 +35,10 @@ install_docker(){
   ensure_docker
   if [ ! -f .env ]; then
     cp .env.example .env 2>/dev/null || true
+    chmod 600 .env
     local pw key
-    pw="$(ask ’Postgres 비밀번호(Enter를 누르면 무작위로 생성됨)’ "$(rand)")"
-    key="$(ask ’ANTHROPIC_API_KEY (비워둘 수 있으며 나중에 UI에서 구성됨)’ ’’)"
+    pw="$(ask 'Postgres 비밀번호(Enter를 누르면 무작위로 생성됨)' "$(rand)")"
+    key="$(ask 'ANTHROPIC_API_KEY (비워둘 수 있으며 나중에 UI에서 구성됨)' '')"
     sed -i.bak "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${pw}|" .env
     sed -i.bak "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${key}|" .env
     rm -f .env.bak
@@ -45,9 +46,8 @@ install_docker(){
   else
     info "기존 .env 상속"
   fi
-  info "이미지를 가져와서 시작하세요..."
-  docker compose pull || true
-  docker compose up -d
+  info "현재 소스에서 한글판 이미지를 빌드하고 시작합니다..."
+  docker compose up -d --build
   ok "시동 완료 → http://localhost:8787"
   info "로그 보기: docker compose logs -f artex"
 }
@@ -57,20 +57,20 @@ install_local(){
   echo "데이터베이스 설치 방법:"
   echo "  1) 기존 PostgreSQL에 연결"
   echo "  2) Docker를 사용하여 PostgreSQL를 생성합니다(docker 필요)."
-  case "$(ask ’선택’ 1)" in
+  case "$(ask '선택' 1)" in
     2)
       ensure_docker
-      local pw; pw="$(ask ’Postgres 비밀번호(임의 캐리지 리턴)’ "$(rand)")"
+      local pw; pw="$(ask 'Postgres 비밀번호(Enter를 누르면 무작위로 생성됨)' "$(rand)")"
       docker run -d --name artex-pg -p 5432:5432 \
         -e POSTGRES_USER=artex -e POSTGRES_PASSWORD="$pw" -e POSTGRES_DB=artex \
         -v artex-pg:/var/lib/postgresql/data postgres:16-alpine
       DB_HOST=127.0.0.1 DB_PORT=5432 DB_USER=artex DB_PASS="$pw" DB_NAME=artex DB_SSL=disable ;;
     *)
-      DB_HOST="$(ask ’데이터베이스 주소’ 127.0.0.1)"
-      DB_PORT="$(ask ’포트’ 5432)"
-      DB_USER="$(ask ’계정’ artex)"
-      DB_PASS="$(ask ’비밀번호’ ’’)"
-      DB_NAME="$(ask ’데이터베이스 이름’ artex)"
+      DB_HOST="$(ask '데이터베이스 주소' 127.0.0.1)"
+      DB_PORT="$(ask '포트' 5432)"
+      DB_USER="$(ask '계정' artex)"
+      DB_PASS="$(ask '비밀번호' '')"
+      DB_NAME="$(ask '데이터베이스 이름' artex)"
       DB_SSL="$(ask 'sslmode (disable/require)' disable)" ;;
   esac
 
@@ -112,10 +112,10 @@ JSON
 
 echo "=============================="
 echo "  ARTEX 설치"
-echo "  1) 모든 Docker 설치"
+echo "  1) Docker 소스 빌드 및 실행(한글판)"
 echo "  2) 로컬 작업(go 컴파일)"
 echo "=============================="
-case "$(ask ’선택’ 1)" in
+case "$(ask '선택' 1)" in
   1) install_docker ;;
   2) install_local ;;
   *) die "잘못된 선택" ;;
